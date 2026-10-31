@@ -17,15 +17,18 @@ export interface BootstrapOverrides {
   mailer?: Mailer;
   env?: NodeJS.ProcessEnv;
   runMigrations?: boolean;
+  /** Tests: capture log output. */
+  logDestination?: pino.DestinationStream;
 }
 
 export async function createContext(o: BootstrapOverrides = {}): Promise<AppContext> {
   const config = { ...loadConfig(o.env ?? process.env), ...(o.config ?? {}) };
-  const log = pino({
+  const logOptions = {
     level: config.LOG_LEVEL,
     redact: { paths: ['req.headers.cookie', 'req.headers.authorization', '*.token', '*.code', '*.password', '*.secret'], censor: '[redacted]' },
     ...(config.NODE_ENV === 'development' ? { transport: { target: 'pino-pretty', options: { colorize: true } } } : {}),
-  });
+  };
+  const log = o.logDestination ? pino(logOptions, o.logDestination) : pino(logOptions);
   const db = new Db(config.DATABASE_URL);
   if (o.runMigrations !== false) {
     const applied = await migrate(db);

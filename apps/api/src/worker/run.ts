@@ -81,7 +81,7 @@ export class Worker {
   }
 
   /** Drain: run ticks until nothing runnable remains (tests). */
-  async drain(maxRounds = 50, kinds?: JobKind[]) {
+  async drain(kinds?: JobKind[], maxRounds = 50) {
     for (let i = 0; i < maxRounds; i++) {
       const n = await this.tick(kinds);
       await Promise.all([...this.inFlight]);

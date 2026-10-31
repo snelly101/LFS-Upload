@@ -60,6 +60,10 @@ export async function recipientRoutes(app: FastifyInstance, ctx: AppContext) {
     const l = await lookupOr404(token);
     if (!l) throw notFound();
     const s = await ctx.db.tx((c) => R.verifyCode(ctx, c, l, code, actorFor(req)));
+    if (!s.ok) {
+      if (s.reason === 'not_available') throw new HttpError(409, 'Verification is not available for this link', 'not_available');
+      throw new HttpError(s.status, 'That code is not valid. Request a new code if it has expired.', 'bad_code');
+    }
     reply.setCookie(R.RECIPIENT_COOKIE, s.token, { ...cookieOptions(ctx), path: `/api/r/${token}` });
     return { ok: true, view: await R.authorisedView(ctx, ctx.db, l, s.session) };
   });

@@ -121,10 +121,16 @@ export async function requestCode(ctx: AppContext, q: Queryable, l: NonNullable<
   return { ok: true, cooldownSeconds: cooldown };
 }
 
-/** Verify a code atomically (row lock + single consumption) and create a scoped recipient session. */
-export async function verifyCode(ctx: AppContext, q: Queryable, l: NonNullable<GrantLookup>, code: string, a: Partial<AuditInput>): Promise<{ token: string; session: RecipientSessionRow }> {
+export type VerifyResult = { ok: true; token: string; session: RecipientSessionRow } | { ok: false; status: number; reason: string };
+
+/**
+ * Verify a code atomically (row lock + single consumption) and create a scoped recipient session.
+ * Failures are returned (not thrown) so the attempt counter and audit record commit with the
+ * caller's transaction; the route converts them to HTTP errors after commit.
+ */
+export async function verifyCode(ctx: AppContext, q: Queryable, l: NonNullable<GrantLookup>, code: string, a: Partial<AuditInput>): Promise<VerifyResult> {
   const { grant, transfer } = l;
-  if (publicState(ctx, l) !== 'needs_verification') throw new HttpError(409, 'Verification is not available for this link', 'not_available');
+  if (publicState(ctx, l) !== 'needs_verification') return { ok: false, status: 409, reason: 'not_available' };
   const now = ctx.clock.now();
   const v = (
     await q.query<{ id: string; code_hash: Buffer; expires_at: Date; attempts: number; max_attempts: number; consumed_at: Date | null; locked_at: Date | null }>(
@@ -133,9 +139,9 @@ export async function verifyCode(ctx: AppContext, q: Queryable, l: NonNullable<G
       [grant.id],
     )
   ).rows[0];
-  const fail = async (reason: string, status = 401) => {
+  const fail = async (reason: string, status = 401): Promise<VerifyResult> => {
     await audit(q, { ...recipientActor(a, grant), eventType: 'recipient.verification_failed', outcome: 'denied', details: { reason } });
-    throw new HttpError(status, 'That code is not valid. Request a new code if it has expired.', 'bad_code');
+    return { ok: false, status, reason };
   };
   if (!v) return fail('no_code');
   if (v.consumed_at) return fail('already_used');
@@ -154,7 +160,7 @@ export async function verifyCode(ctx: AppContext, q: Queryable, l: NonNullable<G
   const s = await createRecipientSession(ctx, q, l, 'required', a);
   await audit(q, { ...recipientActor(a, grant), actorSessionId: s.session.id, eventType: 'recipient.verified', details: { first } });
   if (first) await notifySender(ctx, q, transfer, grant, 'firstVerifiedView', `${grant.email} verified their email and opened "${transfer.title || 'Untitled transfer'}"`, `firstview:${grant.id}`);
-  return s;
+  return { ok: true, ...s };
 }
 
 /** Bearer-mode access: explicit action creates an unverified session. Never recorded as a verified person. */

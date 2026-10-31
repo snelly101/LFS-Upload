@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -26,8 +26,8 @@ export interface BuildOptions {
 }
 
 export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promise<FastifyInstance> {
-  const app = Fastify({
-    loggerInstance: ctx.log as never,
+  const app: FastifyInstance = Fastify({
+    loggerInstance: ctx.log as unknown as FastifyBaseLogger,
     trustProxy: ctx.config.TRUST_PROXY,
     bodyLimit: 1024 * 1024, // JSON bodies only; file bytes go through tus on the raw socket
     requestIdHeader: false,

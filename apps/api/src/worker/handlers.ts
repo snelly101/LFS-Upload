@@ -26,11 +26,15 @@ export async function scanFile(ctx: AppContext, job: ClaimedJob) {
   const outcome = await ctx.scanner.scanFile(p, f.size_bytes);
   const t = (await ctx.db.query<TransferRow>(`SELECT * FROM transfers WHERE id = $1`, [f.transfer_id])).rows[0]!;
   const s = await ctx.settings.all();
-  await ctx.db.tx(async (c) => {
+  // Everything below commits even when the scan must be retried; the retry is signalled afterwards
+  // so an unavailable scanner never rolls back the audit trail, notices and alerts.
+  const retry = await ctx.db.tx(async (c) => {
+    await c.query(`SELECT id FROM transfers WHERE id = $1 FOR UPDATE`, [f.transfer_id]); // lock order: transfer → file → audit
     const detail = 'detail' in outcome ? outcome.detail : null;
     const engine = 'engine' in outcome ? outcome.engine : null;
     await c.query(`UPDATE transfer_files SET scan_status = $2, scan_detail = $3, scan_engine = $4, scanned_at = now() WHERE id = $1`, [f.id, outcome.status, detail, engine]);
     const release = outcome.status === 'clean' || (outcome.status === 'oversized' && s.transferPolicy.allowUnscannedOversizedRelease);
+    let retry = false;
     if (release) {
       await ctx.storage.move(p, ctx.storage.pathFor('released', f.id));
       await c.query(`UPDATE transfer_files SET storage_state = 'released' WHERE id = $1`, [f.id]);
@@ -48,12 +52,14 @@ export async function scanFile(ctx: AppContext, job: ClaimedJob) {
         if (outcome.status === 'unavailable' || outcome.status === 'error') {
           // retry later; the file stays quarantined and blocked meanwhile
           await c.query(`UPDATE transfer_files SET scan_status = 'pending' WHERE id = $1`, [f.id]);
-          throw new Error(`scanner ${outcome.status}: ${detail}`);
+          retry = true;
         }
       }
     }
     await recomputeTransferStatus(c, f.transfer_id);
+    return retry;
   });
+  if (retry) throw new Error(`scanner ${outcome.status}: ${'detail' in outcome ? outcome.detail : ''}`);
 }
 
 // ------------------------------------------------------------------ deletion
@@ -95,6 +101,8 @@ export async function expireSweep(ctx: AppContext) {
       await requestDeletion(ctx, c, t.id, 'stale_draft', { actorKind: 'system' });
     });
   }
+  // A deletion left 'in_progress' for too long means the worker died mid-run: make it pending again.
+  await ctx.db.query(`UPDATE transfers SET deletion_status = 'pending' WHERE deletion_status = 'in_progress' AND deletion_started_at < now() - interval '15 minutes'`);
   // Expired-but-not-yet-deleted transfers: ensure a deletion job exists (covers lost jobs after restore).
   const pending = (await ctx.db.query<{ id: string }>(`SELECT id FROM transfers WHERE deletion_status IN ('pending','failed')`)).rows;
   for (const t of pending) await enqueue(ctx.db, 'delete_transfer', { transferId: t.id, mode: 'reconcile' }, { idempotencyKey: `delete-reconcile:${t.id}:${Math.floor(now.getTime() / 600_000)}`, priority: 10 });
@@ -175,7 +183,7 @@ export async function deliverOutbox(ctx: AppContext, job: ClaimedJob) {
     const t = (await ctx.db.query<TransferRow>(`SELECT * FROM transfers WHERE id = $1`, [m.transfer_id])).rows[0];
     const g = m.grant_id ? (await ctx.db.query<{ status: string }>(`SELECT status::text FROM recipient_grants WHERE id = $1`, [m.grant_id])).rows[0] : null;
     if (!t || !isAccessible(t, ctx.clock.now()) || (g && g.status !== 'invited')) {
-      await ctx.db.query(`UPDATE outbox_messages SET status = 'suppressed', last_error = 'transfer or grant no longer active at send time' WHERE id = $1`, [m.id]);
+      await ctx.db.query(`UPDATE outbox_messages SET status = 'suppressed', last_error = 'transfer or grant no longer active at send time', data = (data - 'code' - 'link') || '{"redacted":true}'::jsonb WHERE id = $1`, [m.id]);
       await audit(ctx.db, { actorKind: 'system', eventType: 'notification.suppressed', transferId: m.transfer_id, grantId: m.grant_id, outcome: 'info', details: { kind: m.kind } });
       return;
     }
@@ -187,7 +195,8 @@ export async function deliverOutbox(ctx: AppContext, job: ClaimedJob) {
   try {
     const res = await ctx.mailer.send({ to: m.to_email, subject: rendered.subject, text: rendered.text, html: rendered.html, headers: { 'X-Snelson-Outbox': String(m.id), 'Auto-Submitted': 'auto-generated' } });
     await ctx.db.tx(async (c) => {
-      await c.query(`UPDATE outbox_messages SET status = 'sent', sent_at = now(), provider_response = $2 WHERE id = $1`, [m.id, res.response]);
+      // Scrub secrets (links carrying invitation tokens, one-time codes) once the message has left the system.
+      await c.query(`UPDATE outbox_messages SET status = 'sent', sent_at = now(), provider_response = $2, data = (data - 'code' - 'link') || '{"redacted":true}'::jsonb WHERE id = $1`, [m.id, res.response]);
       if (m.kind === 'transfer_available') await audit(c, { actorKind: 'system', eventType: 'invitation.accepted_by_provider', transferId: m.transfer_id, grantId: m.grant_id, details: { note: 'SMTP accepted; inbox delivery not confirmed' } });
       else if (m.kind === 'verification_code') await audit(c, { actorKind: 'system', eventType: 'recipient.code_sent', transferId: m.transfer_id, grantId: m.grant_id, outcome: 'info' });
       await resolveAlert(c, 'smtp_failure');
@@ -196,7 +205,7 @@ export async function deliverOutbox(ctx: AppContext, job: ClaimedJob) {
     const msg = e instanceof Error ? e.message : String(e);
     const dead = job.attempts >= job.max_attempts;
     await ctx.db.tx(async (c) => {
-      await c.query(`UPDATE outbox_messages SET status = $2, last_error = $3 WHERE id = $1`, [m.id, dead ? 'failed' : 'queued', msg.slice(0, 300)]);
+      await c.query(`UPDATE outbox_messages SET status = $2, last_error = $3, data = CASE WHEN $4 THEN (data - 'code' - 'link') || '{"redacted":true}'::jsonb ELSE data END WHERE id = $1`, [m.id, dead ? 'failed' : 'queued', msg.slice(0, 300), dead]);
       if (m.kind === 'transfer_available' && dead) await audit(c, { actorKind: 'system', eventType: 'invitation.failed', transferId: m.transfer_id, grantId: m.grant_id, outcome: 'failure', details: { error: msg.slice(0, 200) } });
       if (job.attempts >= 3) await raiseAlert(ctx, c, { kind: 'smtp', severity: 'warning', message: `Email delivery failing: ${msg.slice(0, 120)}`, dedupeKey: 'smtp_failure' });
     });

@@ -73,6 +73,7 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
       if (upload.size === undefined) throw new TusError(400, 'Upload-Length is required (deferred length is not supported)');
       if (upload.size !== f.size_bytes) throw new TusError(400, 'Upload-Length does not match the registered file size');
       await ctx.db.tx(async (c) => {
+        await c.query(`SELECT id FROM transfers WHERE id = $1 FOR UPDATE`, [f.transfer_id]);
         await c.query(`UPDATE transfer_files SET upload_status = 'uploading', storage_state = 'incoming', upload_started_at = COALESCE(upload_started_at, now()) WHERE id = $1 AND upload_status = 'pending'`, [f.id]);
         await audit(c, { ...actor({ auth: raw.snelsonAuth!, correlationId: raw.snelsonCid ?? '', ipPrefix: null, headers: {} } as never), eventType: 'upload.started', transferId: f.transfer_id, fileId: f.id, details: { sizeBytes: f.size_bytes } });
       });
@@ -91,6 +92,7 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
       await ctx.storage.move(incoming, quarantine);
       await ctx.storage.removeIfExists(incoming + '.json');
       await ctx.db.tx(async (c) => {
+        await c.query(`SELECT id FROM transfers WHERE id = $1 FOR UPDATE`, [f.transfer_id]); // lock order: transfer → file → audit
         await c.query(
           `UPDATE transfer_files SET upload_status = 'finalised', storage_state = 'quarantine', uploaded_bytes = size_bytes, upload_finished_at = now(), scan_status = 'pending' WHERE id = $1`,
           [f.id],

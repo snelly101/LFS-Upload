@@ -69,7 +69,7 @@ export async function auditRoutes(app: FastifyInstance, ctx: AppContext) {
         eventType: e.event_type,
         correlationId: e.correlation_id,
         actorKind: e.actor_kind,
-        actorEmail: hideRecipients && e.actor_kind === 'recipient' ? '[recipient]' : e.actor_email,
+        actorEmail: hideRecipients && (e.actor_kind === 'recipient' || (e.grant_id && !e.actor_user_id)) ? '[recipient]' : e.actor_email,
         actorUserId: e.actor_user_id,
         transferId: e.transfer_id,
         fileId: e.file_id,

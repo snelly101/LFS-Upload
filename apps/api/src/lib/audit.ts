@@ -20,6 +20,14 @@ export interface AuditInput {
   userAgent?: string | null;
 }
 
+/** Deterministic JSON: keys sorted recursively so the hash is stable across jsonb round-trips. */
+export function canonicalJson(v: unknown): string {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(canonicalJson).join(',') + ']';
+  const o = v as Record<string, unknown>;
+  return '{' + Object.keys(o).sort().map((k) => JSON.stringify(k) + ':' + canonicalJson(o[k])).join(',') + '}';
+}
+
 const SECRET_KEYS = /^(token|code|otp|password|secret|client_secret|smtp_url|authorization|cookie|session|recovery)/i;
 
 /** Remove anything that looks like a secret before persisting. */
@@ -46,10 +54,13 @@ export function redactDetails(d: Record<string, unknown> | undefined): Record<st
  */
 export async function audit(q: Queryable, input: AuditInput): Promise<number> {
   const details = redactDetails(input.details);
+  // Serialise chain appends for the rest of the transaction so concurrent writers cannot fork the chain.
+  // Lock-ordering rule: acquire row locks (transfer, grant, file) BEFORE calling audit() in a transaction.
+  await q.query('SELECT pg_advisory_xact_lock(727002)');
   const prev = await q.query<{ hash: Buffer }>('SELECT hash FROM audit_events ORDER BY id DESC LIMIT 1');
   const prevHash = prev.rows[0]?.hash ?? null;
   const userAgentHash = input.userAgent ? createHash('sha256').update(input.userAgent).digest('hex').slice(0, 16) : null;
-  const canonical = JSON.stringify({
+  const canonical = canonicalJson({
     t: input.eventType,
     ak: input.actorKind,
     au: input.actorUserId ?? null,
@@ -110,7 +121,7 @@ export async function verifyChain(q: Queryable, fromId = 0): Promise<{ ok: boole
   let first = true;
   for (const row of r.rows) {
     if (!first && (row.prev_hash === null || !prev || !row.prev_hash.equals(prev))) return { ok: false, checked: r.rows.length, brokenAt: row.id };
-    const canonical = JSON.stringify({
+    const canonical = canonicalJson({
       t: row.event_type,
       ak: row.actor_kind,
       au: row.actor_user_id,

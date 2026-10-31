@@ -21,7 +21,13 @@ export async function deleteTransferContent(ctx: AppContext, transferId: string,
   if (!opts.fileId) {
     // Whole-transfer deletion: only when requested (expired/revoked/draft discard). Never delete an active transfer's content.
     if (t.deletion_status === 'none' || t.deletion_status === 'deleted') return 'skipped';
-    await ctx.db.query(`UPDATE transfers SET deletion_status = 'in_progress', deletion_started_at = COALESCE(deletion_started_at, now()), deletion_attempts = deletion_attempts + 1 WHERE id = $1`, [t.id]);
+    // Only one run at a time per transfer: concurrent jobs (expiry-scheduled, on-demand, reconcile) skip.
+    const claimed = await ctx.db.query(
+      `UPDATE transfers SET deletion_status = 'in_progress', deletion_started_at = now(), deletion_attempts = deletion_attempts + 1
+        WHERE id = $1 AND deletion_status IN ('pending','failed') RETURNING id`,
+      [t.id],
+    );
+    if (!claimed.rowCount) return 'skipped';
   }
 
   const failures: string[] = [];

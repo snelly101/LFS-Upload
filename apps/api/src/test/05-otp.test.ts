@@ -3,6 +3,7 @@ import { Harness } from './harness.js';
 
 const h = new Harness();
 let cookie = '';
+let sender: Awaited<ReturnType<Harness['createUser']>>;
 async function freshToken(email: string) {
   const s = await h.sendTransfer(cookie, { recipients: [email] });
   return s.tokens[email]!;
@@ -16,11 +17,21 @@ async function requestCode(token: string) {
 }
 beforeAll(async () => {
   await h.start();
-  cookie = await h.login(await h.createUser('sender'));
+  sender = await h.createUser('sender');
+  cookie = await h.login(sender);
 });
 afterAll(() => h.stop());
 
 describe('5. OTP expiry, replay, attempt limits, resend invalidation and atomic consumption', () => {
+  it('two concurrent verifications of the same code: exactly one succeeds', async () => {
+    const t = await freshToken('race@example.invalid');
+    const { code } = await requestCode(t);
+    expect(code).toBeTruthy();
+    const results = await Promise.all(Array.from({ length: 4 }, () => h.api('POST', `/api/r/${t}/verify`, { code })));
+    expect(results.filter((r) => r.status === 200)).toHaveLength(1);
+    expect(results.filter((r) => r.status === 401)).toHaveLength(3);
+  });
+
   it('code expires after the configured TTL (10 minutes)', async () => {
     const t = await freshToken('exp@example.invalid');
     const { code } = await requestCode(t);
@@ -73,16 +84,6 @@ describe('5. OTP expiry, replay, attempt limits, resend invalidation and atomic 
       }
     }
     expect(limited).toBe(true);
-  });
-
-  it('two concurrent verifications of the same code: exactly one succeeds', async () => {
-    h.clock.advance(2 * 3_600_000); // leave the per-source hourly window used by the previous test
-    const t = await freshToken('race@example.invalid');
-    const { code } = await requestCode(t);
-    expect(code).toBeTruthy();
-    const results = await Promise.all(Array.from({ length: 4 }, () => h.api('POST', `/api/r/${t}/verify`, { code })));
-    expect(results.filter((r) => r.status === 200)).toHaveLength(1);
-    expect(results.filter((r) => r.status === 401)).toHaveLength(3);
   });
 
   it('codes are stored hashed and never in audit details', async () => {

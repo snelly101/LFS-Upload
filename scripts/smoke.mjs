@@ -25,7 +25,12 @@ const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(secret) });
 console.log('login'); console.log((await api('POST', '/api/auth/login', { email: 'admin@dev.snelson.invalid', password: 'correct-horse-battery-staple-2026' })).json);
 const me = (await api('GET', '/api/auth/me')).json;
 if (!me.mfa.enrolled) { console.log('confirm totp', (await api('POST', '/api/auth/enrol/totp/confirm', { code: totp.generate() })).json); }
-else { console.log('mfa', (await api('POST', '/api/auth/mfa/totp/verify', { code: totp.generate() })).json); }
+else {
+  // TOTP codes are one-time per 30 s step; if this step was already used, wait for the next one.
+  let r = await api('POST', '/api/auth/mfa/totp/verify', { code: totp.generate() }, { allowFail: true });
+  if (r.status !== 200) { await new Promise((res) => setTimeout(res, 30_000 - (Date.now() % 30_000) + 500)); r = await api('POST', '/api/auth/mfa/totp/verify', { code: totp.generate() }); }
+  console.log('mfa', r.json);
+}
 console.log('me', (await api('GET', '/api/auth/me')).json.user.authLevel);
 
 const t = (await api('POST', '/api/transfers', { title: 'Smoke test', message: 'hello', notifyPrefs: { everyDownload: true } })).json;
@@ -64,9 +69,10 @@ console.log('invitation link found', !!link);
 const token = link.split('/r/')[1];
 cookie = '';
 console.log('public', (await api('GET', `/api/r/${token}`)).json.state);
+const requestedAt = Date.now();
 console.log('code req', (await api('POST', `/api/r/${token}/code`, {})).json);
 let code;
-for (let i = 0; i < 30; i++) { const dir = '/home/user/LFS-Upload/var/mail'; for (const fn of fs.readdirSync(dir).sort().reverse()) { const txt = fs.readFileSync(path.join(dir, fn), 'utf8'); if (txt.includes('verification code')) { code = txt.match(/code is: (\d{6})/)[1]; break; } } if (code) break; await new Promise(r => setTimeout(r, 1000)); }
+for (let i = 0; i < 30; i++) { const dir = '/home/user/LFS-Upload/var/mail'; for (const fn of fs.readdirSync(dir).sort().reverse()) { if (Number(fn.split('-')[0]) < requestedAt - 1000) continue; const txt = fs.readFileSync(path.join(dir, fn), 'utf8'); if (txt.includes('verification code')) { code = txt.match(/code is: (\d{6})/)[1]; break; } } if (code) break; await new Promise(r => setTimeout(r, 1000)); }
 console.log('wrong code', (await api('POST', `/api/r/${token}/verify`, { code: '000000' }, { allowFail: true })).status);
 const v = (await api('POST', `/api/r/${token}/verify`, { code })).json;
 console.log('verified; files', v.view.files.map(x => x.name), 'recipient', v.view.recipientEmail);

@@ -1,4 +1,4 @@
-import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
+import Fastify, { LogController, type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -32,6 +32,9 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
     bodyLimit: 1024 * 1024, // JSON bodies only; file bytes go through tus on the raw socket
     requestIdHeader: false,
     genReqId: () => randomUUID(),
+    // Built-in request logging is disabled: it would log the full URL including recipient tokens.
+    // Our onResponse hook logs a redacted URL instead.
+    logController: new LogController({ disableRequestLogging: true }),
   });
 
   // Never log cookies, authorisation headers or tokens.

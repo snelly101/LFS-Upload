@@ -58,7 +58,7 @@ export class Worker {
     if (free <= 0) return 0;
     const jobs = await claim(this.ctx.db, this.ctx.config.WORKER_ID, free, kinds);
     for (const job of jobs) {
-      const p = (async () => {
+      const run = async () => {
         try {
           await this.runJob(job);
           await complete(this.ctx.db, job.id);
@@ -73,9 +73,9 @@ export class Worker {
             ]);
           }
         }
-      })();
+      };
+      const p: Promise<void> = run().finally(() => this.inFlight.delete(p));
       this.inFlight.add(p);
-      void p.finally(() => this.inFlight.delete(p));
     }
     return jobs.length;
   }

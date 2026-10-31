@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 // otpauth comes from the api workspace (dev-only dependency path).
 const OTPAuth = require('/home/user/LFS-Upload/apps/api/node_modules/otpauth') as typeof import('otpauth');
 
-export const ADMIN = { email: 'admin@dev.snelson.invalid', password: 'correct-horse-battery-staple-2026', totpSecret: process.env.E2E_TOTP_SECRET ?? '6NSXLG5LYZZW5A2OHHQWDPACQHLIYJJQ' };
+export const ADMIN = { email: 'admin@dev.snelson.invalid', password: 'correct-horse-battery-staple-2026', totpSecret: process.env.E2E_TOTP_SECRET ?? 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' };
 export const MAIL_DIR = process.env.E2E_MAIL_DIR ?? '/home/user/LFS-Upload/var/mail';
 
 export function totpCode(secret = ADMIN.totpSecret): string {

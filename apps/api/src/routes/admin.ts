@@ -72,7 +72,7 @@ export async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
         await c.query(`UPDATE recipient_sessions SET revoked_at = now() WHERE mode = 'bearer' AND revoked_at IS NULL`);
       }
       // Loosening never changes existing transfers (they keep their recorded effective policy).
-      await audit(c, { ...actor(req), eventType: 'config.changed', details: { section, changedKeys: diff, reason: body.reason, secretsUpdated: Object.keys(body.secrets ?? {}), policyVersionId, transfersTightened: tightened } });
+      await audit(c, { ...actor(req), eventType: 'config.changed', details: { section, changedKeys: diff, reason: body.reason, updatedSecretFields: Object.keys(body.secrets ?? {}), policyVersionId, transfersTightened: tightened } });
       return parsed;
     });
     ctx.settings.invalidate();

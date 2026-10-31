@@ -26,6 +26,7 @@ export async function createContext(o: BootstrapOverrides = {}): Promise<AppCont
   const logOptions = {
     level: config.LOG_LEVEL,
     redact: { paths: ['req.headers.cookie', 'req.headers.authorization', '*.token', '*.code', '*.password', '*.secret'], censor: '[redacted]' },
+    serializers: { req: (r: { method?: string; url?: string; id?: string }) => ({ method: r.method, url: String(r.url ?? '').replace(/\/r\/[A-Za-z0-9_-]{20,}/, '/r/[token]').split('?')[0], id: r.id }) },
     ...(config.NODE_ENV === 'development' ? { transport: { target: 'pino-pretty', options: { colorize: true } } } : {}),
   };
   const log = o.logDestination ? pino(logOptions, o.logDestination) : pino(logOptions);

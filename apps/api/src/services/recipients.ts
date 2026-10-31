@@ -98,7 +98,8 @@ export async function requestCode(ctx: AppContext, q: Queryable, l: NonNullable<
   const perTransfer = (await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM recipient_verifications v JOIN recipient_grants g ON g.id = v.grant_id WHERE g.transfer_id = $1 AND v.issued_at > $2`, [transfer.id, hourAgo])).rows[0]!.n;
   const perSource = a.ipPrefix ? (await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM recipient_verifications WHERE ip_prefix = $1 AND issued_at > $2`, [a.ipPrefix, hourAgo])).rows[0]!.n : 0;
   if (perGrant >= vp.maxCodesPerGrantPerHour || perTransfer >= vp.maxCodesPerTransferPerHour || perSource >= vp.maxCodesPerSourcePerHour) {
-    await audit(q, { ...recipientActor(a, grant), eventType: 'recipient.code_rate_limited', outcome: 'denied' });
+    // Written outside the caller's transaction so the denial survives the throw/rollback.
+    await audit(ctx.db, { ...recipientActor(a, grant), eventType: 'recipient.code_rate_limited', outcome: 'denied' });
     throw new HttpError(429, 'Too many codes requested. Please try again later.', 'rate_limited');
   }
   await q.query(`UPDATE recipient_verifications SET superseded_at = now() WHERE grant_id = $1 AND consumed_at IS NULL AND superseded_at IS NULL`, [grant.id]);

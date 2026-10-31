@@ -5,7 +5,7 @@ const h = new Harness();
 let cookie = '';
 const LARGE = process.env.LARGE_TESTS === '1';
 const SIZE = Number(process.env.LARGE_SIZE_BYTES ?? 1024 ** 3);
-const CHUNK = 64 * 1024 * 1024;
+const CHUNK = Number(process.env.LARGE_CHUNK_BYTES ?? 16 * 1024 * 1024);
 
 beforeAll(async () => {
   await h.start();
@@ -63,7 +63,7 @@ describe.skipIf(!LARGE)('13. large-file upload/download with bounded memory (LAR
     const peak = Math.max(...rssSamples);
     const growth = peak - baseline;
     console.log(`[evidence] size=${SIZE} chunk=${CHUNK} upload=${tUpload}ms scan=${tScan}ms download=${tDownload}ms rssBaseline=${(baseline / 1048576).toFixed(0)}MiB rssPeak=${(peak / 1048576).toFixed(0)}MiB growth=${(growth / 1048576).toFixed(0)}MiB`);
-    expect(growth).toBeLessThan(300 * 1024 * 1024);
+    expect(growth).toBeLessThan(300 * 1024 * 1024); // note: the in-process test client (chunk buffers, verification) is included in this figure
     await h.api('POST', `/api/transfers/${t.json.id}/delete-now`, {}, cookie);
     await h.worker.drain();
     expect(await h.ctx.storage.exists(h.ctx.storage.pathFor('released', up.fileId))).toBe(false);

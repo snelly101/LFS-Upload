@@ -10,7 +10,12 @@ import { ADMIN, countMail, freshTotpCode, waitForMail } from '../helpers/env.js'
 async function apiLogin(request: import('@playwright/test').APIRequestContext) {
   const h = { 'x-requested-with': 'snelson' };
   await request.post('http://localhost:3000/api/auth/login', { headers: h, data: { email: ADMIN.email, password: ADMIN.password } });
-  const r = await request.post('http://localhost:3000/api/auth/mfa/totp/verify', { headers: h, data: { code: await freshTotpCode() } });
+  let r = await request.post('http://localhost:3000/api/auth/mfa/totp/verify', { headers: h, data: { code: await freshTotpCode() } });
+  if (!r.ok()) {
+    // The current 30 s step may have been consumed by something outside this run; wait for the next one.
+    await new Promise((res) => setTimeout(res, 30_000 - (Date.now() % 30_000) + 500));
+    r = await request.post('http://localhost:3000/api/auth/mfa/totp/verify', { headers: h, data: { code: await freshTotpCode() } });
+  }
   if (!r.ok()) throw new Error('API MFA login failed: ' + (await r.text()));
   return h;
 }

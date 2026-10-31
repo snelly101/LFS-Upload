@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import net from 'node:net';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { Harness } from './harness.js';
 import { ClamdScanner } from '../lib/scanner.js';
 
@@ -50,16 +53,16 @@ describe('11b. real clamd over INSTREAM', () => {
 });
 
 describe('11c. scanner protocol parsing against a fake clamd', () => {
-  async function fakeClamd(reply: string, opts: { closeEarly?: boolean } = {}) {
+  const SMALL = path.join(os.tmpdir(), 'snelson-fake-clamd-input.bin');
+  beforeAll(async () => fs.writeFile(SMALL, Buffer.alloc(1000, 1)));
+  /** Minimal INSTREAM server: reads the whole framed stream (ends with a zero-length chunk) then replies. */
+  async function fakeClamd(reply: string) {
     const server = net.createServer((sock) => {
-      let got = 0;
+      sock.on('error', () => undefined);
+      let tail = Buffer.alloc(0);
       sock.on('data', (d) => {
-        got += d.length;
-        if (opts.closeEarly && got > 100) {
-          sock.end(reply);
-          return;
-        }
-        if (d.includes(Buffer.from([0, 0, 0, 0])) && d.length >= 4 && d.subarray(d.length - 4).equals(Buffer.from([0, 0, 0, 0]))) sock.end(reply);
+        tail = Buffer.concat([tail, d]).subarray(-4);
+        if (tail.equals(Buffer.from([0, 0, 0, 0]))) sock.end(reply);
       });
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
@@ -76,19 +79,19 @@ describe('11c. scanner protocol parsing against a fake clamd', () => {
     it(`"${reply.replace(/\0/g, '')}" → ${expected}`, async () => {
       const f = await fakeClamd(reply);
       const s = new ClamdScanner('127.0.0.1', f.port, 5000, 10 ** 9);
-      const r = await s.scanFile(process.execPath, 1000);
+      const r = await s.scanFile(SMALL, 1000);
       expect(r.status).toBe(expected);
       await f.close();
     });
   }
   it('unreachable daemon → unavailable; slow daemon → timeout', async () => {
     const s = new ClamdScanner('127.0.0.1', 1, 1000, 10 ** 9);
-    expect((await s.scanFile(process.execPath, 1000)).status).toBe('unavailable');
-    const server = net.createServer(() => undefined);
+    expect((await s.scanFile(SMALL, 1000)).status).toBe('unavailable');
+    const server = net.createServer((sock) => sock.on('error', () => undefined));
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
     const port = (server.address() as net.AddressInfo).port;
     const slow = new ClamdScanner('127.0.0.1', port, 300, 10 ** 9);
-    expect((await slow.scanFile(process.execPath, 1000)).status).toBe('timeout');
+    expect((await slow.scanFile(SMALL, 1000)).status).toBe('timeout');
     server.close();
   });
 });

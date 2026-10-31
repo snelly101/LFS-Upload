@@ -1,0 +1,52 @@
+# nginx alternative to deploy/Caddyfile. TLS termination via certbot or your PKI.
+# Key points: no request/response buffering (no plaintext temp copies), no body size limit
+# (the application enforces policy limits), long timeouts for multi-hour transfers, token redaction in logs.
+
+map $request_uri $redacted_uri {
+    default $request_uri;
+    "~^(?<p>/(api/)?r/)[A-Za-z0-9_-]{20,}(?<rest>.*)$" "${p}[redacted]${rest}";
+}
+log_format snelson '$remote_addr - [$time_iso8601] "$request_method $redacted_uri $server_protocol" '
+                   '$status $body_bytes_sent $request_time';
+
+server {
+    listen 80;
+    server_name send.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name send.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/send.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/send.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    access_log /var/log/nginx/snelson-access.log snelson;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
+
+    # Streaming: with buffering off, proxy_temp_path is never written for these requests.
+    client_max_body_size 0;
+    proxy_request_buffering off;
+    proxy_buffering off;
+    proxy_http_version 1.1;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    send_timeout 3600s;
+    client_body_timeout 3600s;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Connection "";
+    }
+}
+# Set TRUST_PROXY=true in .env when the API sits behind nginx so rate limits use the real client IP.

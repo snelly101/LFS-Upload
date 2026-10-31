@@ -27,7 +27,7 @@ export interface BuildOptions {
 
 export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
-    loggerInstance: ctx.log,
+    loggerInstance: ctx.log as never,
     trustProxy: ctx.config.TRUST_PROXY,
     bodyLimit: 1024 * 1024, // JSON bodies only; file bytes go through tus on the raw socket
     requestIdHeader: false,

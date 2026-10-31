@@ -1,0 +1,59 @@
+# Caddy reverse proxy for Snelson Send. PUBLIC_HOST and ACME_EMAIL come from deploy/.env.
+# Caddy streams request and response bodies by default (no temp-file buffering), so no plaintext
+# copy of uploads or downloads is written by the proxy. There is no request body size limit by
+# default; limits are enforced by the application (transfer policy + tus maxSize).
+{
+	email {$ACME_EMAIL}
+	servers {
+		# Long uploads/downloads: do not cut idle-but-streaming connections.
+		timeouts {
+			read_body 0
+			read_header 30s
+			write 0
+			idle 10m
+		}
+	}
+}
+
+{$PUBLIC_HOST} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		X-Frame-Options "DENY"
+		-Server
+	}
+
+	reverse_proxy api:3000 {
+		# Stream bytes as they arrive; never buffer file transfers.
+		flush_interval -1
+		transport http {
+			read_timeout 0
+			write_timeout 0
+			dial_timeout 10s
+			response_header_timeout 0
+		}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	# Access log with recipient tokens and other secrets redacted. Invitation and session tokens
+	# only appear in /r/<token> and /api/r/<token>/… paths; those are replaced before logging.
+	log {
+		output file /data/access.log {
+			roll_size 50mb
+			roll_keep 5
+		}
+		format filter {
+			wrap json
+			fields {
+				request>uri replace "/r/[A-Za-z0-9_-]{20,}" "/r/[redacted]"
+				request>headers>Cookie delete
+				request>headers>Authorization delete
+				resp_headers>Set-Cookie delete
+			}
+		}
+	}
+}

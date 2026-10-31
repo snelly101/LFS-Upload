@@ -1,0 +1,175 @@
+# Snelson Send – single-host deployment.
+# Only caddy publishes ports (80/443). Everything else lives on private networks.
+# Images are pinned by tag; see docs/UPGRADE.md for the update procedure.
+# The Docker socket is never mounted into any container.
+
+name: snelson-send
+
+x-app-common: &app-common
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  image: snelson-send:local
+  env_file: .env
+  environment:
+    NODE_ENV: production
+    HOST: 0.0.0.0
+    PORT: "3000"
+    DATABASE_URL: postgres://snelson:${POSTGRES_PASSWORD}@db:5432/snelson
+    CONTENT_ROOT: /srv/content
+    CLAMD_HOST: clamav
+    CLAMD_PORT: "3310"
+    WEB_DIST: /app/apps/web/dist
+  volumes:
+    # /srv/snelson/content must be a LUKS-encrypted filesystem excluded from backups (docs/INSTALL.md).
+    - /srv/snelson/content:/srv/content
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+  user: "10001:10001"
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "50m", max-file: "5" }
+  depends_on:
+    db: { condition: service_healthy }
+    clamav: { condition: service_started }
+
+services:
+  caddy:
+    image: caddy:2.9.1
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt:
+      - no-new-privileges:true
+    networks: [frontend]
+    depends_on: [api]
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 512M }
+
+  api:
+    <<: *app-common
+    command: ["node", "dist/server.js"]
+    networks: [frontend, backend]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 1536M }
+
+  worker:
+    <<: *app-common
+    command: ["node", "dist/worker.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://snelson:${POSTGRES_PASSWORD}@db:5432/snelson
+      CONTENT_ROOT: /srv/content
+      CLAMD_HOST: clamav
+      CLAMD_PORT: "3310"
+      WORKER_ID: worker-1
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 60s
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 1024M }
+
+  db:
+    image: postgres:16.6-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: snelson
+      POSTGRES_USER: snelson
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - /srv/snelson/db:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snelson -d snelson"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    shm_size: 256m
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+    deploy:
+      resources:
+        limits: { cpus: "2.0", memory: 2G }
+
+  clamav:
+    # Isolated scanner. No ports are published; only api/worker reach it on the backend network.
+    # freshclam (inside this image) needs outbound HTTPS to database.clamav.net for signature updates.
+    image: clamav/clamav:1.4.2
+    restart: unless-stopped
+    volumes:
+      - ./clamd.conf:/etc/clamav/clamd.conf:ro
+      - clamav_db:/var/lib/clamav
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [SETGID, SETUID, CHOWN, DAC_OVERRIDE]
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+    deploy:
+      resources:
+        # ClamAV loads the full signature set into RAM; 3 GiB is the practical minimum.
+        limits: { cpus: "2.0", memory: 4G }
+
+  # Development only: `docker compose --profile dev up`. Captures all outbound mail; never reaches real inboxes.
+  mailpit:
+    image: axllent/mailpit:v1.22.3
+    profiles: [dev]
+    networks: [backend]
+    ports:
+      - "127.0.0.1:8025:8025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+
+volumes:
+  caddy_data:
+  caddy_config:
+  clamav_db:

@@ -31,10 +31,6 @@ const schema = z.object({
   WORKER_CONCURRENCY: z.coerce.number().int().default(4),
   SCAN_CONCURRENCY: z.coerce.number().int().default(1),
   STREAM_RECHECK_MS: z.coerce.number().int().default(2000),
-  SESSION_IDLE_MINUTES: z.coerce.number().int().default(60),
-  SESSION_ABSOLUTE_HOURS: z.coerce.number().int().default(12),
-  RECENT_AUTH_MINUTES: z.coerce.number().int().default(15),
-  RECIPIENT_SESSION_MINUTES: z.coerce.number().int().default(60),
   COOKIE_SECURE: bool.optional(),
   DEV_SEED: bool.default(false),
 });

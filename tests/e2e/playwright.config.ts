@@ -16,7 +16,7 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:5173',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    launchOptions: { executablePath: process.env.PW_CHROME ?? '/opt/pw-browsers/chromium-1243/chrome-linux/chrome' },
+    launchOptions: { executablePath: process.env.PW_CHROME ?? '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', args: ['--no-sandbox'] },
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1360, height: 900 } } },

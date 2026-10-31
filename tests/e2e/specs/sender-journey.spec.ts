@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { loginAsAdmin } from '../helpers/login.js';
+import { loginAsSender } from '../helpers/login.js';
 import { makeFixture, waitForMail } from '../helpers/env.js';
 
 /**
@@ -8,7 +8,7 @@ import { makeFixture, waitForMail } from '../helpers/env.js';
  * summary and send. Then the recipient journey is exercised in recipient-journey.spec.ts.
  */
 test('sender creates, uploads, scans and sends a transfer (keyboard navigation)', async ({ page }) => {
-  await loginAsAdmin(page);
+  await loginAsSender(page);
   // Keyboard: Tab to the New transfer action from the top bar.
   await page.keyboard.press('Tab');
   const newTransfer = page.getByRole('link', { name: /new transfer/i }).first();
@@ -32,12 +32,13 @@ test('sender creates, uploads, scans and sends a transfer (keyboard navigation)'
 
   await expect(page.getByText(/Only these 1 recipient|Only this recipient|1 recipient/i).first()).toBeVisible();
   await expect(page.getByText(/Email verification required/i).first()).toBeVisible();
+  const sentAt = Date.now();
   const send = page.getByRole('button', { name: /^send/i }).first();
   await send.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByText(/active|invitation/i).first()).toBeVisible({ timeout: 30_000 });
 
-  const mail = await waitForMail((t) => t.includes('e2e-recipient@example.invalid') && t.includes('has sent you'));
+  const mail = await waitForMail((t) => t.includes('e2e-recipient@example.invalid') && t.includes('has sent you'), 30_000, sentAt);
   expect(mail).toMatch(/\/r\/[A-Za-z0-9_-]{40,}/);
   // The invitation must not reveal the filename.
   expect(mail).not.toContain('e2e-document.bin');

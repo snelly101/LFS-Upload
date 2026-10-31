@@ -1,15 +1,17 @@
 import type { Page } from '@playwright/test';
-import { ADMIN, totpCode } from './env.js';
+import { ADMIN, SENDER, freshTotpCode } from './env.js';
 
 /** Sign in through the real UI using the keyboard where practical. */
-export async function loginAsAdmin(page: Page) {
+export async function loginAs(page: Page, account: { email: string; password: string; totpSecret: string }) {
   await page.goto('/login');
-  await page.getByLabel(/email/i).fill(ADMIN.email);
-  await page.getByLabel(/password/i).fill(ADMIN.password);
+  await page.getByLabel(/email/i).fill(account.email);
+  await page.getByLabel(/password/i).fill(account.password);
   await page.keyboard.press('Enter');
   const code = page.getByLabel(/code/i).first();
   await code.waitFor({ timeout: 15_000 });
-  await code.fill(totpCode());
+  await code.fill(await freshTotpCode(account.totpSecret));
   await page.keyboard.press('Enter');
   await page.waitForURL(/\/transfers/, { timeout: 20_000 });
 }
+export const loginAsAdmin = (page: Page) => loginAs(page, ADMIN);
+export const loginAsSender = (page: Page) => loginAs(page, SENDER);

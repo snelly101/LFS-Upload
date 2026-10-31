@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+/var/
+/storage/
+/tests/e2e/test-results/
+/tests/e2e/playwright-report/
+/docs/screenshots/*.tmp.png
+.DS_Store

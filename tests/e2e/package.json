@@ -1,0 +1,8 @@
+{
+  "name": "@snelson/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "playwright test" },
+  "devDependencies": { "@playwright/test": "1.63.0", "typescript": "5.9.3", "@types/node": "22.20.5" }
+}

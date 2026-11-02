@@ -9,6 +9,9 @@ x-app-common: &app-common
   build:
     context: ..
     dockerfile: deploy/Dockerfile
+    # Build steps use the host network: in DMZ/firewalled hosts the BuildKit bridge sometimes cannot
+    # reach the npm registry even when ordinary containers can. Runtime services are unaffected.
+    network: host
   image: securesend:local
   env_file: .env
   environment:

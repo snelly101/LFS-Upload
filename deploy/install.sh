@@ -44,7 +44,10 @@ if [ ! -f .env ]; then
 fi
 
 docker compose build
-docker compose up -d db clamav
+# Wait for PostgreSQL's health check before migrating; clamav is started in parallel but not waited for
+# (its first signature download takes minutes and the API tolerates a scanner that is not yet ready).
+docker compose up -d clamav
+docker compose up -d --wait db
 docker compose run --rm --no-deps api node dist/cli.js migrate
 docker compose up -d
 if [ -n "$ADMIN_EMAIL" ]; then

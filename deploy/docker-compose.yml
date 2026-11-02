@@ -43,7 +43,7 @@ x-app-common: &app-common
 
 services:
   caddy:
-    image: caddy:2.9.1
+    image: caddy:2.11.7
     restart: unless-stopped
     ports:
       - "80:80"
@@ -102,7 +102,7 @@ services:
         limits: { cpus: "2.0", memory: 1024M }
 
   db:
-    image: postgres:16.6-bookworm
+    image: postgres:16.15-bookworm
     restart: unless-stopped
     environment:
       POSTGRES_DB: securesend
@@ -130,7 +130,7 @@ services:
   clamav:
     # Isolated scanner. No ports are published; only api/worker reach it on the backend network.
     # freshclam (inside this image) needs outbound HTTPS to database.clamav.net for signature updates.
-    image: clamav/clamav:1.4.2
+    image: clamav/clamav:1.5.4
     restart: unless-stopped
     volumes:
       - ./clamd.conf:/etc/clamav/clamd.conf:ro

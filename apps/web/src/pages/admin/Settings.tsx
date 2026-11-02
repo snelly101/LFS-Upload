@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatBytes } from '@snelson/shared';
+import { formatBytes } from '@securesend/shared';
 import { post, get, errorMessage } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 import { SectionForm, NumField, GiBField, TextField, ListField, Check, useSettings } from './common';
@@ -202,7 +202,7 @@ export function NotificationsSection() {
             <NumField id="m-port" label="Port" value={d.port} min={1} max={65535} onChange={(v) => set({ port: v })} />
             <Check label="Implicit TLS (port 465)" checked={d.secure} onChange={(v) => set({ secure: v })} hint="Otherwise STARTTLS is negotiated when offered." />
             <TextField id="m-user" label="Username" value={d.username} onChange={(v) => set({ username: v })} />
-            <TextField id="m-from" label="From address" value={d.from} onChange={(v) => set({ from: v })} placeholder="Snelson Send <send@example.com>" />
+            <TextField id="m-from" label="From address" value={d.from} onChange={(v) => set({ from: v })} placeholder="Together Housing Secure File Send <send@example.com>" />
             <TextField id="m-reply" label="Reply-to (optional)" value={d.replyTo} onChange={(v) => set({ replyTo: v })} />
             <p className="small">Password: {d.passwordSet ? 'set (never shown)' : 'not set'}</p>
           </>

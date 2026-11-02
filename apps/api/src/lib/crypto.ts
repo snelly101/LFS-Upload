@@ -38,7 +38,7 @@ export function randomRecoveryCode(): string {
 }
 
 /** AES-256-GCM with a random 12-byte nonce; output = nonce || tag || ciphertext. */
-export function encryptSecret(key: Buffer, plaintext: string | Buffer, aad = 'snelson'): Buffer {
+export function encryptSecret(key: Buffer, plaintext: string | Buffer, aad = 'securesend'): Buffer {
   const nonce = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key.subarray(0, 32), nonce);
   cipher.setAAD(Buffer.from(aad));
@@ -46,7 +46,7 @@ export function encryptSecret(key: Buffer, plaintext: string | Buffer, aad = 'sn
   return Buffer.concat([nonce, cipher.getAuthTag(), ct]);
 }
 
-export function decryptSecret(key: Buffer, blob: Buffer, aad = 'snelson'): Buffer {
+export function decryptSecret(key: Buffer, blob: Buffer, aad = 'securesend'): Buffer {
   const nonce = blob.subarray(0, 12);
   const tag = blob.subarray(12, 28);
   const ct = blob.subarray(28);

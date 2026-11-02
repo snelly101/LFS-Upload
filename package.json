@@ -1,8 +1,8 @@
 {
-  "name": "snelson-send",
+  "name": "securesend",
   "private": true,
   "version": "0.1.0",
-  "description": "Self-hosted secure large-file transfer application (working name: Snelson Send)",
+  "description": "Self-hosted secure large-file transfer application (working name: Together Housing Secure File Send)",
   "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=22.12 <23"
@@ -10,14 +10,14 @@
   "scripts": {
     "build": "pnpm -r --filter ./packages/* --filter ./apps/* run build",
     "typecheck": "pnpm -r run typecheck",
-    "test": "pnpm --filter @snelson/api run test",
-    "test:e2e": "pnpm --filter @snelson/e2e run test",
-    "dev:api": "pnpm --filter @snelson/api run dev",
-    "dev:worker": "pnpm --filter @snelson/api run dev:worker",
-    "dev:web": "pnpm --filter @snelson/web run dev",
-    "db:migrate": "pnpm --filter @snelson/api run db:migrate",
-    "db:seed": "pnpm --filter @snelson/api run db:seed",
-    "bootstrap-admin": "pnpm --filter @snelson/api run bootstrap-admin"
+    "test": "pnpm --filter @securesend/api run test",
+    "test:e2e": "pnpm --filter @securesend/e2e run test",
+    "dev:api": "pnpm --filter @securesend/api run dev",
+    "dev:worker": "pnpm --filter @securesend/api run dev:worker",
+    "dev:web": "pnpm --filter @securesend/web run dev",
+    "db:migrate": "pnpm --filter @securesend/api run db:migrate",
+    "db:seed": "pnpm --filter @securesend/api run db:seed",
+    "bootstrap-admin": "pnpm --filter @securesend/api run bootstrap-admin"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

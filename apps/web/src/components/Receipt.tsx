@@ -1,4 +1,4 @@
-import type { ActivityEvent } from '@snelson/shared';
+import type { ActivityEvent } from '@securesend/shared';
 import { fmt } from '../lib/time';
 import { eventLabel } from '../lib/events';
 

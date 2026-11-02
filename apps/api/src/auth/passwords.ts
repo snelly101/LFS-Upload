@@ -13,7 +13,7 @@ export async function verifyPassword(hashed: string, pw: string): Promise<boolea
   }
 }
 
-const COMMON = new Set(['password1234', 'passwordpassword', 'qwertyuiop12', '123456789012', 'letmeinletmein', 'snelsonsend1']);
+const COMMON = new Set(['password1234', 'passwordpassword', 'qwertyuiop12', '123456789012', 'letmeinletmein', 'securesendsend1']);
 
 export function passwordProblems(pw: string, email?: string): string[] {
   const out: string[] = [];

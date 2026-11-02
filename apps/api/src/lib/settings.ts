@@ -1,4 +1,4 @@
-import { SettingsSections, defaultSettings, type AllSettings, type SettingsKey, type EffectivePolicy } from '@snelson/shared';
+import { SettingsSections, defaultSettings, type AllSettings, type SettingsKey, type EffectivePolicy } from '@securesend/shared';
 import type { Db, Queryable } from '../db.js';
 import { decryptSecret, encryptSecret } from './crypto.js';
 

@@ -15,9 +15,9 @@ case "$SRC" in
   *) cp "$SRC" "$TMP" ;;
 esac
 docker compose stop api worker
-docker compose exec -T db psql -U snelson -d postgres -c "DROP DATABASE IF EXISTS snelson_restore;" -c "CREATE DATABASE snelson_restore OWNER snelson;"
-docker compose exec -T db pg_restore -U snelson -d snelson_restore --no-owner --no-privileges < "$TMP"
-docker compose exec -T db psql -U snelson -d postgres -c "ALTER DATABASE snelson RENAME TO snelson_old_$(date +%s);" -c "ALTER DATABASE snelson_restore RENAME TO snelson;"
+docker compose exec -T db psql -U securesend -d postgres -c "DROP DATABASE IF EXISTS securesend_restore;" -c "CREATE DATABASE securesend_restore OWNER securesend;"
+docker compose exec -T db pg_restore -U securesend -d securesend_restore --no-owner --no-privileges < "$TMP"
+docker compose exec -T db psql -U securesend -d postgres -c "ALTER DATABASE securesend RENAME TO securesend_old_$(date +%s);" -c "ALTER DATABASE securesend_restore RENAME TO securesend;"
 docker compose run --rm --no-deps api node dist/cli.js migrate
 docker compose up -d
 echo "Restored. The worker's startup pass expires overdue transfers and the hourly reconcile removes orphaned content."

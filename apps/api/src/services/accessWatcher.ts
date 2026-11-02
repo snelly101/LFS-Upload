@@ -34,7 +34,7 @@ export async function startAccessWatcher(ctx: AppContext): Promise<() => Promise
   let client: pg.Client | null = null;
   const connect = async () => {
     if (stopped) return;
-    client = new pg.Client({ connectionString: ctx.config.DATABASE_URL, application_name: 'snelson-access-watcher' });
+    client = new pg.Client({ connectionString: ctx.config.DATABASE_URL, application_name: 'securesend-access-watcher' });
     client.on('notification', () => void recheck().catch(() => undefined));
     client.on('error', () => {
       client?.end().catch(() => undefined);
@@ -43,7 +43,7 @@ export async function startAccessWatcher(ctx: AppContext): Promise<() => Promise
     });
     try {
       await client.connect();
-      await client.query('LISTEN snelson_access_changed');
+      await client.query('LISTEN securesend_access_changed');
     } catch (e) {
       ctx.log.warn({ err: e }, 'access watcher LISTEN failed; relying on periodic recheck');
       client = null;

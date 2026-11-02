@@ -193,7 +193,7 @@ export async function deliverOutbox(ctx: AppContext, job: ClaimedJob) {
   const rendered = render(tctx, m.data as never);
   await ctx.db.query(`UPDATE outbox_messages SET status = 'sending', attempts = attempts + 1 WHERE id = $1`, [m.id]);
   try {
-    const res = await ctx.mailer.send({ to: m.to_email, subject: rendered.subject, text: rendered.text, html: rendered.html, headers: { 'X-Snelson-Outbox': String(m.id), 'Auto-Submitted': 'auto-generated' } });
+    const res = await ctx.mailer.send({ to: m.to_email, subject: rendered.subject, text: rendered.text, html: rendered.html, headers: { 'X-SecureSend-Outbox': String(m.id), 'Auto-Submitted': 'auto-generated' } });
     await ctx.db.tx(async (c) => {
       // Scrub secrets (links carrying invitation tokens, one-time codes) once the message has left the system.
       await c.query(`UPDATE outbox_messages SET status = 'sent', sent_at = now(), provider_response = $2, data = (data - 'code' - 'link') || '{"redacted":true}'::jsonb WHERE id = $1`, [m.id, res.response]);

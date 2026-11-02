@@ -28,7 +28,7 @@ importers:
       '@simplewebauthn/server':
         specifier: 14.0.3
         version: 14.0.3
-      '@snelson/shared':
+      '@securesend/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@tus/file-store':
@@ -101,7 +101,7 @@ importers:
       '@simplewebauthn/browser':
         specifier: 14.0.0
         version: 14.0.0
-      '@snelson/shared':
+      '@securesend/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@tanstack/react-query':

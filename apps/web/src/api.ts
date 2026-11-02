@@ -9,7 +9,7 @@ export class ApiError extends Error {
   }
 }
 
-const BASE_HEADERS = { 'X-Requested-With': 'snelson' };
+const BASE_HEADERS = { 'X-Requested-With': 'securesend' };
 
 async function parse(r: Response): Promise<unknown> {
   const text = await r.text();

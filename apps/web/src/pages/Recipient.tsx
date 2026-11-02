@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router';
-import { formatBytes, type RecipientAuthorisedView } from '@snelson/shared';
+import { formatBytes, type RecipientAuthorisedView } from '@securesend/shared';
 import { get, post, errorMessage, ApiError } from '../api';
 import { fmtLong, countdown } from '../lib/time';
 

@@ -1,4 +1,4 @@
-import { formatBytes, formatDateTimeLong } from '@snelson/shared';
+import { formatBytes, formatDateTimeLong } from '@securesend/shared';
 
 export interface TemplateContext {
   productName: string;

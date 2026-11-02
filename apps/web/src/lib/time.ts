@@ -1,4 +1,4 @@
-import { formatDateTime, formatDateTimeLong, formatCountdown } from '@snelson/shared';
+import { formatDateTime, formatDateTimeLong, formatCountdown } from '@securesend/shared';
 
 let currentTz = 'Europe/London';
 export function setTimeZone(tz: string) {

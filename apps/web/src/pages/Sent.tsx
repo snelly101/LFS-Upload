@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { formatBytes, type TransferSummary } from '@snelson/shared';
+import { formatBytes, type TransferSummary } from '@securesend/shared';
 import { get } from '../api';
 import { transferState } from '../components/Status';
 import { fmt, countdown } from '../lib/time';

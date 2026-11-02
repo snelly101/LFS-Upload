@@ -1,6 +1,6 @@
 # Test evidence (integration suite)
 
-Integration tests run against a real PostgreSQL 16 database (`snelson_test`), a real `clamd`
+Integration tests run against a real PostgreSQL 16 database (`securesend_test`), a real `clamd`
 (ClamAV 1.5.4 with an EICAR-only signature set because this build environment cannot reach
 `database.clamav.net`), real HTTP on an ephemeral port (so Range, streaming, tus hijack and
 live stream termination are exercised for real), an in-memory mail sink (`MemoryMailer`) and an
@@ -15,14 +15,14 @@ pg_ctlcluster 16 main start
 clamd --config-file=/tmp/clamtest/clamd.conf        # EICAR-only test database, TCP 127.0.0.1:3310
 
 # the suite (sequential, ~45 s)
-pnpm --filter @snelson/api run test
+pnpm --filter @securesend/api run test
 
 # the opt-in large-file test (1 GiB default; LARGE_SIZE_BYTES overrides)
-LARGE_TESTS=1 pnpm --filter @snelson/api run test -- src/test/13-large-bounded-memory.test.ts
-LARGE_TESTS=1 LARGE_SIZE_BYTES=2147483648 pnpm --filter @snelson/api run test -- src/test/13-large-bounded-memory.test.ts
+LARGE_TESTS=1 pnpm --filter @securesend/api run test -- src/test/13-large-bounded-memory.test.ts
+LARGE_TESTS=1 LARGE_SIZE_BYTES=2147483648 pnpm --filter @securesend/api run test -- src/test/13-large-bounded-memory.test.ts
 ```
 
-## Result (2026-10-31, `pnpm --filter @snelson/api run test`)
+## Result (2026-10-31, `pnpm --filter @securesend/api run test`)
 
 ```
  ✓ src/test/08-live-stop.test.ts (2 tests) 6534ms

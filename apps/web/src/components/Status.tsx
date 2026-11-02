@@ -1,4 +1,4 @@
-import type { DeletionStatus, ScanStatus, TransferStatus, UploadStatus, GrantStatus } from '@snelson/shared';
+import type { DeletionStatus, ScanStatus, TransferStatus, UploadStatus, GrantStatus } from '@securesend/shared';
 
 type Tone = 'neutral' | 'progress' | 'ok' | 'warn' | 'err';
 

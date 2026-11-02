@@ -9,7 +9,7 @@ import { dedupeFilename, sanitiseFilename } from '../lib/filenames.js';
 import { enqueue } from '../lib/jobs.js';
 import { computeEffectivePolicy } from '../lib/settings.js';
 import { queueEmail, inApp } from './notifications.js';
-import type { EffectivePolicy, TransferDetail, TransferSummary, TransferFileView, GrantView } from '@snelson/shared';
+import type { EffectivePolicy, TransferDetail, TransferSummary, TransferFileView, GrantView } from '@securesend/shared';
 
 export interface TransferRow {
   id: string;

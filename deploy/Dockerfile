@@ -9,15 +9,15 @@ COPY packages/shared/package.json packages/shared/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY tests/e2e/package.json tests/e2e/
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --filter '!@snelson/e2e'
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --filter '!@securesend/e2e'
 COPY packages ./packages
 COPY apps ./apps
-RUN pnpm --filter @snelson/shared run build \
- && pnpm --filter @snelson/api run build \
- && pnpm --filter @snelson/web run build
+RUN pnpm --filter @securesend/shared run build \
+ && pnpm --filter @securesend/api run build \
+ && pnpm --filter @securesend/web run build
 # Re-install production dependencies only for the runtime packages (keeps pnpm's workspace links intact).
 RUN rm -rf node_modules apps/*/node_modules packages/*/node_modules \
- && pnpm install --prod --frozen-lockfile --filter @snelson/api --filter @snelson/shared \
+ && pnpm install --prod --frozen-lockfile --filter @securesend/api --filter @securesend/shared \
  && rm -rf apps/web/src apps/web/node_modules apps/api/src tests
 
 FROM node:22.12.0-bookworm-slim AS runtime

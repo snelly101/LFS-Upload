@@ -33,7 +33,7 @@ docs/           Architecture, runbooks, threat model, evidence
 ```
 pnpm install
 cp deploy/.env.example apps/api/.env   # edit DATABASE_URL, PUBLIC_URL, SERVER_SECRET_KEY, CONTENT_ROOT, CLAMD_*
-pnpm --filter @snelson/shared run build
+pnpm --filter @securesend/shared run build
 pnpm db:migrate && pnpm db:seed          # fictitious dev accounts, see docs/DEVELOPMENT.md
 pnpm dev:api & pnpm dev:worker & pnpm dev:web
 ```

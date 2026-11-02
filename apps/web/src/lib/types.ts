@@ -1,4 +1,4 @@
-import type { CurrentUser } from '@snelson/shared';
+import type { CurrentUser } from '@securesend/shared';
 
 export interface MfaStatus {
   totp: boolean;

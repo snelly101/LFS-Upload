@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatBytes, type ActivityEvent, type GrantView, type TransferDetail } from '@snelson/shared';
+import { formatBytes, type ActivityEvent, type GrantView, type TransferDetail } from '@securesend/shared';
 import { get, post, errorMessage } from '../api';
 import { transferState } from '../components/Status';
 import { Dialog } from '../components/Dialog';

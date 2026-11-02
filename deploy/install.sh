@@ -3,7 +3,7 @@
 #   sudo deploy/install.sh admin@example.com
 # Prerequisites that this script does NOT do for you (see docs/INSTALL.md):
 #   - DNS A/AAAA record for PUBLIC_HOST pointing at this server, ports 80/443 reachable
-#   - LUKS-encrypted filesystems mounted at /srv/snelson/content and /srv/snelson/db
+#   - LUKS-encrypted filesystems mounted at /srv/securesend/content and /srv/securesend/db
 #   - swap encrypted or disabled, core dumps disabled
 set -euo pipefail
 ADMIN_EMAIL="${1:-}"
@@ -23,15 +23,15 @@ if ! command -v docker >/dev/null 2>&1; then
   systemctl enable --now docker
 fi
 
-for d in /srv/snelson/content /srv/snelson/db; do
+for d in /srv/securesend/content /srv/securesend/db; do
   if ! mountpoint -q "$d"; then
     echo "WARNING: $d is not a separate mount. Production requires a LUKS-encrypted volume here (docs/INSTALL.md)." >&2
     mkdir -p "$d"
   fi
 done
-# api/worker run as uid 10001 and own the content tree; postgres image manages /srv/snelson/db itself.
-chown 10001:10001 /srv/snelson/content
-chmod 700 /srv/snelson/content
+# api/worker run as uid 10001 and own the content tree; postgres image manages /srv/securesend/db itself.
+chown 10001:10001 /srv/securesend/content
+chmod 700 /srv/securesend/content
 
 if [ ! -f .env ]; then
   cp .env.example .env

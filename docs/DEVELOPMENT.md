@@ -6,15 +6,15 @@ Playwright for browser tests.
 
 ```bash
 pnpm install
-sudo -u postgres psql -c "CREATE USER snelson WITH PASSWORD 'snelson_dev';" \
-  -c "CREATE DATABASE snelson OWNER snelson;" -c "CREATE DATABASE snelson_test OWNER snelson;"
+sudo -u postgres psql -c "CREATE USER securesend WITH PASSWORD 'securesend_dev';" \
+  -c "CREATE DATABASE securesend OWNER securesend;" -c "CREATE DATABASE securesend_test OWNER securesend;"
 cp deploy/.env.example apps/api/.env   # then set NODE_ENV=development, PUBLIC_URL=http://localhost:3000,
-                                       # DATABASE_URL=postgres://snelson:snelson_dev@127.0.0.1:5432/snelson,
+                                       # DATABASE_URL=postgres://securesend:securesend_dev@127.0.0.1:5432/securesend,
                                        # SERVER_SECRET_KEY=$(openssl rand -base64 48), CONTENT_ROOT=$PWD/var/content,
                                        # MAIL_TRANSPORT=file, MAIL_FILE_DIR=$PWD/var/mail, CLAMD_MAX_STREAM_BYTES=104857600
-pnpm --filter @snelson/shared build
+pnpm --filter @securesend/shared build
 pnpm db:migrate
-pnpm bootstrap-admin admin@dev.snelson.invalid --password 'correct-horse-battery-staple-2026'
+pnpm bootstrap-admin admin@dev.securesend.invalid --password 'correct-horse-battery-staple-2026'
 pnpm db:seed            # optional fictitious accounts (below)
 scripts/dev-api.sh start   # API on :3000 (background, logs in /tmp/api.log)
 scripts/dev-api.sh worker  # worker (logs in /tmp/worker.log)
@@ -26,8 +26,8 @@ With Compose, `docker compose --profile dev up` adds Mailpit at http://127.0.0.1
 
 ## Seed accounts (development only)
 All use password `correct-horse-battery-staple-2026` and the TOTP secret printed by `pnpm db:seed`
-(`JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP`): `admin@dev.snelson.invalid` (admin), `alex.sender@dev.snelson.invalid`
-(sender), `audrey.audit@dev.snelson.invalid` (auditor). `seed` refuses to run when `NODE_ENV=production`.
+(`JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP`): `admin@dev.securesend.invalid` (admin), `alex.sender@dev.securesend.invalid`
+(sender), `audrey.audit@dev.securesend.invalid` (auditor). `seed` refuses to run when `NODE_ENV=production`.
 
 ## Local clamd with a test signature only
 Signature downloads may be blocked in a sandbox. clamd will start with a tiny custom database that only
@@ -55,7 +55,7 @@ Set `CLAMD_MAX_STREAM_BYTES=104857600` to match. Production uses the full signat
 
 ## Tests
 ```bash
-pnpm test        # API integration tests (vitest) against snelson_test; needs clamd for scan tests
+pnpm test        # API integration tests (vitest) against securesend_test; needs clamd for scan tests
 pnpm test:e2e    # Playwright browser tests against a built UI
 ```
 See docs/TEST-EVIDENCE.md for what is covered and the recorded results.

@@ -1,7 +1,7 @@
 # Threat model
 
 ## Assets
-1. File content (quarantine, released, tus partial uploads, scanner/zip scratch) under `/srv/snelson/content`.
+1. File content (quarantine, released, tus partial uploads, scanner/zip scratch) under `/srv/securesend/content`.
 2. Transfer metadata: titles, messages, filenames, recipient addresses, download activity.
 3. Credentials and secrets: password hashes, TOTP seeds, passkeys, recovery codes, session tokens,
    invitation tokens, one-time codes, OIDC client secret, SMTP password, `SERVER_SECRET_KEY`.

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, Outlet } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AllSettings } from '@snelson/shared';
+import type { AllSettings } from '@securesend/shared';
 import { get, put, errorMessage } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 

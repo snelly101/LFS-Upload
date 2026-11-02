@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { defaultSettings } from '@snelson/shared';
+import { defaultSettings } from '@securesend/shared';
 import { Harness } from './harness.js';
 import { computeEffectivePolicy } from '../lib/settings.js';
 import { purgeAudit } from '../worker/handlers.js';

@@ -1,4 +1,4 @@
-import type { GrantView } from '@snelson/shared';
+import type { GrantView } from '@securesend/shared';
 import { fmtShort } from '../lib/time';
 
 /**

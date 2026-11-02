@@ -134,7 +134,7 @@ describe('17. logs, error responses, email templates and exports do not leak tok
   it('CSRF: state-changing calls without the custom header or from a foreign origin are refused', async () => {
     const r = await fetch(h.base + '/api/transfers', { method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: '{"title":"csrf"}' });
     expect(r.status).toBe(403);
-    const r2 = await fetch(h.base + '/api/transfers', { method: 'POST', headers: { cookie, 'content-type': 'application/json', 'x-requested-with': 'snelson', origin: 'https://evil.invalid' }, body: '{"title":"csrf"}' });
+    const r2 = await fetch(h.base + '/api/transfers', { method: 'POST', headers: { cookie, 'content-type': 'application/json', 'x-requested-with': 'securesend', origin: 'https://evil.invalid' }, body: '{"title":"csrf"}' });
     expect(r2.status).toBe(403);
     const list = await h.api('GET', '/api/transfers?q=csrf', undefined, cookie);
     expect(list.json.items).toHaveLength(0);

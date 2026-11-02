@@ -7,15 +7,15 @@ import { encryptSecret } from './lib/crypto.js';
 /**
  * Development seed: clearly fictitious accounts and transfers. Never runs in production.
  * Accounts (password "correct-horse-battery-staple-2026", TOTP secret printed):
- *   admin@dev.snelson.invalid (admin), alex.sender@dev.snelson.invalid (sender), audrey.audit@dev.snelson.invalid (auditor)
+ *   admin@dev.securesend.invalid (admin), alex.sender@dev.securesend.invalid (sender), audrey.audit@dev.securesend.invalid (auditor)
  */
 export async function seedDevelopment(ctx: AppContext) {
   const password = await hashPassword('correct-horse-battery-staple-2026');
   const totpSecret = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
   const users = [
-    ['admin@dev.snelson.invalid', 'Dev Administrator', 'admin'],
-    ['alex.sender@dev.snelson.invalid', 'Alex Sender', 'sender'],
-    ['audrey.audit@dev.snelson.invalid', 'Audrey Auditor', 'auditor'],
+    ['admin@dev.securesend.invalid', 'Dev Administrator', 'admin'],
+    ['alex.sender@dev.securesend.invalid', 'Alex Sender', 'sender'],
+    ['audrey.audit@dev.securesend.invalid', 'Audrey Auditor', 'auditor'],
   ] as const;
   for (const [email, name, role] of users) {
     await ctx.db.tx(async (c) => {

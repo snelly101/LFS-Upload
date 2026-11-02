@@ -5,7 +5,7 @@ import { audit, type AuditInput } from '../lib/audit.js';
 import { hmacSha256, randomNumericCode, randomToken, safeEqual, sha256 } from '../lib/crypto.js';
 import { isAccessible, type TransferRow } from './transfers.js';
 import { queueEmail, inApp } from './notifications.js';
-import type { RecipientAuthorisedView, RecipientPublicView } from '@snelson/shared';
+import type { RecipientAuthorisedView, RecipientPublicView } from '@securesend/shared';
 
 export interface GrantRow {
   id: string;

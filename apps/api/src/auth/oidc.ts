@@ -1,7 +1,7 @@
 import * as client from 'openid-client';
 import type { AppContext } from '../context.js';
 import type { Queryable } from '../db.js';
-import type { IdentitySettings } from '@snelson/shared';
+import type { IdentitySettings } from '@securesend/shared';
 
 export interface OidcIdentity {
   issuer: string;

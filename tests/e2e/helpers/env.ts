@@ -2,12 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as OTPAuth from 'otpauth';
 
-export const SENDER = { email: 'alex.sender@dev.snelson.invalid', password: 'correct-horse-battery-staple-2026', totpSecret: process.env.E2E_TOTP_SECRET ?? 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' };
-export const ADMIN = { email: 'admin@dev.snelson.invalid', password: 'correct-horse-battery-staple-2026', totpSecret: process.env.E2E_TOTP_SECRET ?? 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' };
+export const SENDER = { email: 'alex.sender@dev.securesend.invalid', password: 'correct-horse-battery-staple-2026', totpSecret: process.env.E2E_TOTP_SECRET ?? 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' };
+export const ADMIN = { email: 'admin@dev.securesend.invalid', password: 'correct-horse-battery-staple-2026', totpSecret: process.env.E2E_TOTP_SECRET ?? 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP' };
 export const MAIL_DIR = process.env.E2E_MAIL_DIR ?? '/home/user/LFS-Upload/var/mail';
 
 // Shared across Playwright worker processes via a small file in /tmp.
-const USED_STEPS_FILE = '/tmp/snelson-e2e-totp-steps.json';
+const USED_STEPS_FILE = '/tmp/securesend-e2e-totp-steps.json';
 const usedSteps = {
   get(k: string): number | undefined {
     try { return (JSON.parse(fs.readFileSync(USED_STEPS_FILE, 'utf8')) as Record<string, number>)[k]; } catch { return undefined; }
@@ -58,7 +58,7 @@ export async function waitForMail(pred: (text: string) => boolean, ms = 30_000, 
 }
 
 export function makeFixture(name: string, bytes: number): string {
-  const dir = '/tmp/snelson-e2e';
+  const dir = '/tmp/securesend-e2e';
   fs.mkdirSync(dir, { recursive: true });
   const p = path.join(dir, name);
   const buf = Buffer.alloc(bytes);

@@ -8,7 +8,7 @@ import { ADMIN, countMail, freshTotpCode, waitForMail } from '../helpers/env.js'
  * sensitive is shown before verification and that the link alone sends no code.
  */
 async function apiLogin(request: import('@playwright/test').APIRequestContext) {
-  const h = { 'x-requested-with': 'snelson' };
+  const h = { 'x-requested-with': 'securesend' };
   await request.post('http://localhost:3000/api/auth/login', { headers: h, data: { email: ADMIN.email, password: ADMIN.password } });
   let r = await request.post('http://localhost:3000/api/auth/mfa/totp/verify', { headers: h, data: { code: await freshTotpCode() } });
   if (!r.ok()) {

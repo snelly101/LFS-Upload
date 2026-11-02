@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatBytes, formatDuration } from '@snelson/shared';
+import { formatBytes, formatDuration } from '@securesend/shared';
 import { get, post, errorMessage } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 import { fmt } from '../../lib/time';

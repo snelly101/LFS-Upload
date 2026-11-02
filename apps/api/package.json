@@ -1,5 +1,5 @@
 {
-  "name": "@snelson/api",
+  "name": "@securesend/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -23,7 +23,7 @@
     "@fastify/static": "10.1.8",
     "@node-rs/argon2": "2.2.2",
     "@simplewebauthn/server": "14.0.3",
-    "@snelson/shared": "workspace:*",
+    "@securesend/shared": "workspace:*",
     "@tus/file-store": "2.1.1",
     "@tus/server": "2.4.6",
     "archiver": "8.0.0",

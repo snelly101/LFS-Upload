@@ -117,7 +117,7 @@ export class Harness {
 
   /** JSON API call. Returns the merged cookie string for follow-up calls. */
   async api<T = any>(method: string, path: string, body?: unknown, cookie = '', headers: Record<string, string> = {}): Promise<ApiResponse<T>> {
-    const h: Record<string, string> = { 'x-requested-with': 'snelson', ...headers };
+    const h: Record<string, string> = { 'x-requested-with': 'securesend', ...headers };
     if (cookie) h.cookie = cookie;
     let payload: BodyInit | undefined;
     if (body !== undefined) {

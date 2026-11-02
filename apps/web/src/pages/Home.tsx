@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import * as tus from 'tus-js-client';
-import { formatBytes, formatDuration, formatRate, type TransferDetail, type TransferFileView, type TransferPolicy, type TransferSummary } from '@snelson/shared';
+import { formatBytes, formatDuration, formatRate, type TransferDetail, type TransferFileView, type TransferPolicy, type TransferSummary } from '@securesend/shared';
 import { get, post, patch, put, del, errorMessage } from '../api';
 import { Picker } from '../components/Picker';
 import { fmtLong, toLocalInput, fromLocalInput } from '../lib/time';
@@ -45,14 +45,14 @@ interface Remembered {
 }
 function remembered(): Remembered {
   try {
-    return JSON.parse(localStorage.getItem('snelson-compose-prefs') ?? '{}') as Remembered;
+    return JSON.parse(localStorage.getItem('securesend-compose-prefs') ?? '{}') as Remembered;
   } catch {
     return {};
   }
 }
 function remember(r: Remembered) {
   try {
-    localStorage.setItem('snelson-compose-prefs', JSON.stringify({ ...remembered(), ...r }));
+    localStorage.setItem('securesend-compose-prefs', JSON.stringify({ ...remembered(), ...r }));
   } catch {
     /* per-viewer convenience only */
   }
@@ -189,10 +189,10 @@ export function HomePage() {
       chunkSize: CHUNK,
       retryDelays: [1000, 3000, 5000, 10000, 20000],
       metadata: { uploadId, filename: u.file.name },
-      headers: { 'X-Requested-With': 'snelson' },
+      headers: { 'X-Requested-With': 'securesend' },
       storeFingerprintForResuming: true,
       removeFingerprintOnSuccess: true,
-      fingerprint: async () => `snelson:${uploadId}`,
+      fingerprint: async () => `securesend:${uploadId}`,
       onProgress: (bytesSent) => {
         setUploads((us) =>
           us.map((x) => {
@@ -704,21 +704,21 @@ function autoTitle(uploads: LocalUpload[]): string {
 
 function rememberUploadId(transferId: string, name: string, size: number, uploadId: string) {
   try {
-    localStorage.setItem(`snelson-upload:${transferId}:${name}:${size}`, uploadId);
+    localStorage.setItem(`securesend-upload:${transferId}:${name}:${size}`, uploadId);
   } catch {
     /* ignore */
   }
 }
 function forgetUploadId(transferId: string, name: string, size: number) {
   try {
-    localStorage.removeItem(`snelson-upload:${transferId}:${name}:${size}`);
+    localStorage.removeItem(`securesend-upload:${transferId}:${name}:${size}`);
   } catch {
     /* ignore */
   }
 }
 function recallUploadId(transferId: string, name: string, size: number): string | null {
   try {
-    return localStorage.getItem(`snelson-upload:${transferId}:${name}:${size}`);
+    return localStorage.getItem(`securesend-upload:${transferId}:${name}:${size}`);
   } catch {
     return null;
   }

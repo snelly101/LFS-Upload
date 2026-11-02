@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const BASE = 'http://localhost:3000';
-const H = { 'content-type': 'application/json', 'x-requested-with': 'snelson' };
+const H = { 'content-type': 'application/json', 'x-requested-with': 'securesend' };
 let cookie = '';
 async function api(method, url, body, extra = {}) {
   const r = await fetch(BASE + url, { method, headers: { ...H, cookie, ...extra.headers }, body: body === undefined ? undefined : typeof body === 'string' || body instanceof Uint8Array ? body : JSON.stringify(body), redirect: 'manual' });
@@ -22,7 +22,7 @@ async function api(method, url, body, extra = {}) {
 const secret = process.argv[2];
 const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(secret) });
 
-console.log('login'); console.log((await api('POST', '/api/auth/login', { email: 'admin@dev.snelson.invalid', password: 'correct-horse-battery-staple-2026' })).json);
+console.log('login'); console.log((await api('POST', '/api/auth/login', { email: 'admin@dev.securesend.invalid', password: 'correct-horse-battery-staple-2026' })).json);
 const me = (await api('GET', '/api/auth/me')).json;
 if (!me.mfa.enrolled) { console.log('confirm totp', (await api('POST', '/api/auth/enrol/totp/confirm', { code: totp.generate() })).json); }
 else {

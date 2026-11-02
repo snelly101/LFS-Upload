@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { IdentitySchema } from '@snelson/shared';
+import { IdentitySchema } from '@securesend/shared';
 import { OidcError, roleFromGroups, validateClaims } from '../auth/oidc.js';
 
 const settings = IdentitySchema.parse({
@@ -50,7 +50,7 @@ describe('3. SSO rejects wrong tenant, issuer, audience and unapproved users/gro
   it('rejects wrong tenant', () => expect(reason({ ...good, tid: '22222222-2222-2222-2222-222222222222' })).toBe('tenant_mismatch'));
   it('rejects a user who is neither allow-listed nor in an allowed group (email suffix alone grants nothing)', () => {
     expect(reason({ ...good, oid: 'stranger', groups: [] })).toBe('not_allowed');
-    expect(reason({ ...good, oid: 'stranger', groups: ['group-unrelated'], preferred_username: 'ceo@snelsonserver.com' })).toBe('not_allowed');
+    expect(reason({ ...good, oid: 'stranger', groups: ['group-unrelated'], preferred_username: 'ceo@together-housing.example' })).toBe('not_allowed');
     expect(reason({ ...good, oid: 'stranger', groups: ['group-senders'] })).toBe('ok');
   });
   it('rejects missing subject', () => expect(reason({ ...good, oid: undefined, sub: undefined })).toBe('no_subject'));

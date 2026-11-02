@@ -6,7 +6,7 @@ map $request_uri $redacted_uri {
     default $request_uri;
     "~^(?<p>/(api/)?r/)[A-Za-z0-9_-]{20,}(?<rest>.*)$" "${p}[redacted]${rest}";
 }
-log_format snelson '$remote_addr - [$time_iso8601] "$request_method $redacted_uri $server_protocol" '
+log_format securesend '$remote_addr - [$time_iso8601] "$request_method $redacted_uri $server_protocol" '
                    '$status $body_bytes_sent $request_time';
 
 server {
@@ -23,7 +23,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/send.example.com/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
 
-    access_log /var/log/nginx/snelson-access.log snelson;
+    access_log /var/log/nginx/securesend-access.log securesend;
 
     add_header Strict-Transport-Security "max-age=31536000" always;
     add_header X-Content-Type-Options "nosniff" always;

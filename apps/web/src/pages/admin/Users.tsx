@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatBytes } from '@snelson/shared';
+import { formatBytes } from '@securesend/shared';
 import { get, post, patch, errorMessage } from '../../api';
 import { useAuth } from '../../auth/AuthContext';
 import { fmt } from '../../lib/time';

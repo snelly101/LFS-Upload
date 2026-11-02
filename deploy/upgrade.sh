@@ -2,9 +2,9 @@
 # Upgrade to the checked-out version. Expect a short outage (single host). See docs/UPGRADE.md.
 set -euo pipefail
 cd "$(cd "$(dirname "$0")" && pwd)"
-PREV_IMAGE="snelson-send:rollback-$(date +%Y%m%d%H%M%S)"
-if docker image inspect snelson-send:local >/dev/null 2>&1; then
-  docker tag snelson-send:local "$PREV_IMAGE"
+PREV_IMAGE="securesend:rollback-$(date +%Y%m%d%H%M%S)"
+if docker image inspect securesend:local >/dev/null 2>&1; then
+  docker tag securesend:local "$PREV_IMAGE"
   echo "$PREV_IMAGE" > .last-image
 fi
 ./backup.sh

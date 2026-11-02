@@ -3,26 +3,26 @@
 # Images are pinned by tag; see docs/UPGRADE.md for the update procedure.
 # The Docker socket is never mounted into any container.
 
-name: snelson-send
+name: securesend
 
 x-app-common: &app-common
   build:
     context: ..
     dockerfile: deploy/Dockerfile
-  image: snelson-send:local
+  image: securesend:local
   env_file: .env
   environment:
     NODE_ENV: production
     HOST: 0.0.0.0
     PORT: "3000"
-    DATABASE_URL: postgres://snelson:${POSTGRES_PASSWORD}@db:5432/snelson
+    DATABASE_URL: postgres://securesend:${POSTGRES_PASSWORD}@db:5432/securesend
     CONTENT_ROOT: /srv/content
     CLAMD_HOST: clamav
     CLAMD_PORT: "3310"
     WEB_DIST: /app/apps/web/dist
   volumes:
-    # /srv/snelson/content must be a LUKS-encrypted filesystem excluded from backups (docs/INSTALL.md).
-    - /srv/snelson/content:/srv/content
+    # /srv/securesend/content must be a LUKS-encrypted filesystem excluded from backups (docs/INSTALL.md).
+    - /srv/securesend/content:/srv/content
   read_only: true
   tmpfs:
     - /tmp:size=64m,mode=1777
@@ -85,7 +85,7 @@ services:
     command: ["node", "dist/worker.js"]
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://snelson:${POSTGRES_PASSWORD}@db:5432/snelson
+      DATABASE_URL: postgres://securesend:${POSTGRES_PASSWORD}@db:5432/securesend
       CONTENT_ROOT: /srv/content
       CLAMD_HOST: clamav
       CLAMD_PORT: "3310"
@@ -102,15 +102,15 @@ services:
     image: postgres:16.6-bookworm
     restart: unless-stopped
     environment:
-      POSTGRES_DB: snelson
-      POSTGRES_USER: snelson
+      POSTGRES_DB: securesend
+      POSTGRES_USER: securesend
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--data-checksums"
     volumes:
-      - /srv/snelson/db:/var/lib/postgresql/data
+      - /srv/securesend/db:/var/lib/postgresql/data
     networks: [backend]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snelson -d snelson"]
+      test: ["CMD-SHELL", "pg_isready -U securesend -d securesend"]
       interval: 10s
       timeout: 5s
       retries: 10

@@ -16,7 +16,7 @@ self-hosted large-file dispatch application for Together Housing.
 | Email | SMTP via nodemailer; outbox + worker | Standard. Dev/test uses Mailpit (Compose) or an in-process SMTP capture server (tests). |
 | UI | React 19 + Vite 7, hand-written CSS with design tokens | No UI kit, so the "dispatch desk" look is original. TanStack Query for server state. |
 | Reverse proxy / TLS | Caddy 2 (nginx guidance also documented) | Automatic certificates, simple config, request body is streamed (no buffering to temp files). |
-| Encryption at rest | LUKS volume for `/srv/snelson/content` and DB volume, documented prerequisites and operator checks | Protects powered-off storage; does **not** isolate content from a compromised running host. App-level content encryption is deliberately not claimed. |
+| Encryption at rest | LUKS volume for `/srv/securesend/content` and DB volume, documented prerequisites and operator checks | Protects powered-off storage; does **not** isolate content from a compromised running host. App-level content encryption is deliberately not claimed. |
 
 Not used: Kubernetes, cloud object storage, hosted analytics, hosted error tracking, third-party scripts.
 
@@ -35,7 +35,7 @@ Not used: Kubernetes, cloud object storage, hosted analytics, hosted error track
 Storage layout (single encrypted volume so renames are atomic):
 
 ```
-/srv/snelson/content/
+/srv/securesend/content/
   incoming/    tus partial uploads (file <uploadId>, metadata <uploadId>.json)
   quarantine/  finalised but not yet released (<fileId>)
   released/    scan passed, downloadable (<fileId>)
@@ -88,7 +88,7 @@ Core tables (see `apps/api/migrations/*.sql` for the authoritative definitions):
 * Every API route resolves the acting principal and checks object ownership in SQL (`WHERE sender_id = $user`) – no client-side trust.
 * tus hooks: `onIncomingRequest` (ownership of the upload id), `onUploadCreate` (file record exists, belongs to the user, declared size within policy, quota reserved), `maxSize` (policy), `namingFunction` (our random id), `onUploadFinish` (size equals declared, move to quarantine, enqueue scan).
 * Download: `GET /r/:token/files/:fileId` requires a valid recipient session bound to the grant; each request rechecks transfer status, expiry, revocation, deletion state, and scan state; allowance reserved atomically with `UPDATE … WHERE downloads_used < limit RETURNING`.
-* Live stop: every active stream registers in the process's `ActiveStreams` registry. A Postgres `LISTEN snelson_access_changed` plus a 2-second re-check loop destroys sockets of streams whose grant/transfer became invalid. Target bound: 5 s. Tested.
+* Live stop: every active stream registers in the process's `ActiveStreams` registry. A Postgres `LISTEN securesend_access_changed` plus a 2-second re-check loop destroys sockets of streams whose grant/transfer became invalid. Target bound: 5 s. Tested.
 * Deletion: job per transfer + hourly reconciliation sweep that scans the storage directories and the DB for anything overdue; deletion is verified by `stat` on every managed path before `deleted` is recorded.
 
 ## 6. Threat model (summary – full version in THREAT-MODEL.md)

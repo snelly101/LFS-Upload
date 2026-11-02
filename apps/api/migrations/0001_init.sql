@@ -1,4 +1,4 @@
--- Snelson Send initial schema. All timestamps are timestamptz (UTC).
+-- Together Housing Secure File Send initial schema. All timestamps are timestamptz (UTC).
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS citext;
 
@@ -406,7 +406,7 @@ CREATE TRIGGER users_touch BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION 
 -- access change notifications for live stream termination
 CREATE OR REPLACE FUNCTION notify_access_changed() RETURNS trigger AS $$
 BEGIN
-  PERFORM pg_notify('snelson_access_changed', json_build_object('table', TG_TABLE_NAME, 'id', NEW.id)::text);
+  PERFORM pg_notify('securesend_access_changed', json_build_object('table', TG_TABLE_NAME, 'id', NEW.id)::text);
   RETURN NEW;
 END $$ LANGUAGE plpgsql;
 CREATE TRIGGER transfers_access_changed AFTER UPDATE OF status, revoked_at, expires_at, deletion_status ON transfers

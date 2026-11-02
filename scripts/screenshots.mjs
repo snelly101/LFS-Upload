@@ -30,7 +30,7 @@ const waitStep = async () => { await new Promise((r) => setTimeout(r, 30_000 - (
 await page.goto(`${BASE}/login`);
 await page.waitForSelector('#email');
 await shot('login.png');
-await page.fill('#email', 'alex.sender@dev.snelson.invalid');
+await page.fill('#email', 'alex.sender@dev.securesend.invalid');
 await page.fill('#password', 'correct-horse-battery-staple-2026');
 await page.click('button:has-text("Continue")');
 await page.waitForSelector('#mfa-code');
@@ -121,7 +121,7 @@ const ap = await actx.newPage();
 ap.on('console', (m) => { if (m.type() === 'error') errors.push(`[admin console] ${m.text()}`); });
 ap.on('pageerror', (e) => errors.push(`[admin pageerror] ${e.message}`));
 await ap.goto(`${BASE}/login`);
-await ap.fill('#email', 'admin@dev.snelson.invalid');
+await ap.fill('#email', 'admin@dev.securesend.invalid');
 await ap.fill('#password', 'correct-horse-battery-staple-2026');
 await ap.click('button:has-text("Continue")');
 await ap.waitForSelector('#mfa-code');

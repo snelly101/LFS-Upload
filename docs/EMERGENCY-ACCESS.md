@@ -5,7 +5,7 @@ with a broken IdP). Every step is audited (`user.bootstrap_admin` with `emergenc
 access to the server, which is itself a privileged position that should be logged by the host.
 
 1. Confirm the situation and record it (ticket). Two people should be involved where possible.
-2. On the server: `cd /opt/snelson-send`.
+2. On the server: `cd /opt/securesend`.
 3. Create or elevate an administrator with a one-time invitation:
    ```bash
    docker compose -f deploy/docker-compose.yml run --rm --no-deps api node dist/cli.js bootstrap-admin ops@example.com --force
@@ -16,7 +16,7 @@ access to the server, which is itself a privileged position that should be logge
 4. If SSO is enforced and broken, the invited local account can still sign in only if local login is
    enabled. Temporarily enable it directly in the database (audited by the change you make next in the UI):
    ```bash
-   docker compose -f deploy/docker-compose.yml exec db psql -U snelson -d snelson \
+   docker compose -f deploy/docker-compose.yml exec db psql -U securesend -d securesend \
      -c "UPDATE settings SET value = jsonb_set(jsonb_set(value,'{ssoEnforced}','false'),'{localLoginEnabled}','true') WHERE key='identity';"
    ```
    Then fix the SSO configuration in Identity & access, run the SSO test, and re-enforce.

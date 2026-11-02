@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { SettingsSections, type SettingsKey } from '@snelson/shared';
+import { SettingsSections, type SettingsKey } from '@securesend/shared';
 import type { AppContext } from '../context.js';
 import { badRequest, conflict, notFound } from '../context.js';
 import { actor, requireAuth } from '../auth/guards.js';

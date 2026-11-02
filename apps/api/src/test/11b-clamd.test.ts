@@ -53,7 +53,7 @@ describe('11b. real clamd over INSTREAM', () => {
 });
 
 describe('11c. scanner protocol parsing against a fake clamd', () => {
-  const SMALL = path.join(os.tmpdir(), 'snelson-fake-clamd-input.bin');
+  const SMALL = path.join(os.tmpdir(), 'securesend-fake-clamd-input.bin');
   beforeAll(async () => fs.writeFile(SMALL, Buffer.alloc(1000, 1)));
   /** Minimal INSTREAM server: reads the whole framed stream (ends with a zero-length chunk) then replies. */
   async function fakeClamd(reply: string) {

@@ -16,7 +16,7 @@ export type Queryable = {
 export class Db {
   readonly pool: pg.Pool;
   constructor(connectionString: string, max = 10) {
-    this.pool = new Pool({ connectionString, max, application_name: 'snelson-send' });
+    this.pool = new Pool({ connectionString, max, application_name: 'securesend' });
   }
 
   async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {

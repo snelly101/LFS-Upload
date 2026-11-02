@@ -13,8 +13,8 @@ import { inApp } from '../services/notifications.js';
 
 type TusReq = { runtime?: { node?: { req?: IncomingMessage } } };
 interface RawWithAuth extends IncomingMessage {
-  snelsonAuth?: AuthState;
-  snelsonCid?: string;
+  securesendAuth?: AuthState;
+  securesendCid?: string;
 }
 
 class TusError extends Error {
@@ -35,7 +35,7 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
   const store = new FileStore({ directory: ctx.storage.dir('incoming') });
 
   async function ownedFile(raw: RawWithAuth, uploadId: string): Promise<FileRow> {
-    const auth = raw.snelsonAuth;
+    const auth = raw.securesendAuth;
     if (!auth) throw new TusError(401, 'Authentication required');
     const r = await ctx.db.query<FileRow & { sender_id: string; tstatus: string }>(
       `SELECT f.*, t.sender_id, t.status::text AS tstatus FROM transfer_files f JOIN transfers t ON t.id = f.transfer_id WHERE f.upload_id = $1`,
@@ -64,7 +64,7 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
     },
     onIncomingRequest: async (req, uploadId) => {
       const raw = (req as unknown as TusReq).runtime?.node?.req as RawWithAuth;
-      if (!raw?.snelsonAuth) throw new TusError(401, 'Authentication required');
+      if (!raw?.securesendAuth) throw new TusError(401, 'Authentication required');
       if (uploadId) await ownedFile(raw, uploadId);
     },
     onUploadCreate: async (req, upload) => {
@@ -75,7 +75,7 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
       await ctx.db.tx(async (c) => {
         await c.query(`SELECT id FROM transfers WHERE id = $1 FOR UPDATE`, [f.transfer_id]);
         await c.query(`UPDATE transfer_files SET upload_status = 'uploading', storage_state = 'incoming', upload_started_at = COALESCE(upload_started_at, now()) WHERE id = $1 AND upload_status = 'pending'`, [f.id]);
-        await audit(c, { ...actor({ auth: raw.snelsonAuth!, correlationId: raw.snelsonCid ?? '', ipPrefix: null, headers: {} } as never), eventType: 'upload.started', transferId: f.transfer_id, fileId: f.id, details: { sizeBytes: f.size_bytes } });
+        await audit(c, { ...actor({ auth: raw.securesendAuth!, correlationId: raw.securesendCid ?? '', ipPrefix: null, headers: {} } as never), eventType: 'upload.started', transferId: f.transfer_id, fileId: f.id, details: { sizeBytes: f.size_bytes } });
       });
       return {};
     },
@@ -99,7 +99,7 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
         );
         await c.query(`DELETE FROM storage_reservations WHERE file_id = $1`, [f.id]);
         await enqueue(c, 'scan_file', { fileId: f.id }, { idempotencyKey: `scan:${f.id}`, priority: 30, maxAttempts: 5 });
-        await audit(c, { ...actor({ auth: raw.snelsonAuth!, correlationId: raw.snelsonCid ?? '', ipPrefix: null, headers: {} } as never), eventType: 'upload.completed', transferId: f.transfer_id, fileId: f.id, details: { sizeBytes: f.size_bytes } });
+        await audit(c, { ...actor({ auth: raw.securesendAuth!, correlationId: raw.securesendCid ?? '', ipPrefix: null, headers: {} } as never), eventType: 'upload.completed', transferId: f.transfer_id, fileId: f.id, details: { sizeBytes: f.size_bytes } });
         await recomputeTransferStatus(c, f.transfer_id);
       });
       return {};
@@ -133,8 +133,8 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
   const handler = async (req: Parameters<typeof guard>[0], reply: Parameters<typeof guard>[1]) => {
     await guard(req, reply);
     const raw = req.raw as RawWithAuth;
-    raw.snelsonAuth = req.auth!;
-    raw.snelsonCid = req.correlationId;
+    raw.securesendAuth = req.auth!;
+    raw.securesendCid = req.correlationId;
     reply.hijack();
     await tus.handle(req.raw, reply.raw);
   };

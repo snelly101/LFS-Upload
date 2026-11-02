@@ -7,7 +7,7 @@ Range; ZIP downloads restart from the beginning).
 ## Procedure
 1. Read the release notes for migration or configuration changes (`apps/api/migrations/`, `deploy/.env.example` diff).
 2. `git fetch && git checkout <tag>`
-3. `sudo deploy/upgrade.sh` — tags the current image as `snelson-send:rollback-<stamp>`, runs
+3. `sudo deploy/upgrade.sh` — tags the current image as `securesend:rollback-<stamp>`, runs
    `deploy/backup.sh`, builds, stops api/worker, applies migrations (`node dist/cli.js migrate`, advisory-locked
    and idempotent), starts everything.
 4. Check `docker compose ps`, `/readyz`, System health, and send a test transfer.

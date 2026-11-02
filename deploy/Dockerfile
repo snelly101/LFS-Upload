@@ -2,7 +2,8 @@
 # Multi-stage build: shared package, API (tsc) and web UI (vite) in one image; the API serves apps/web/dist.
 FROM node:22.12.0-bookworm-slim AS build
 ENV CI=true PNPM_HOME=/pnpm PATH=/pnpm:$PATH
-RUN corepack enable
+# corepack is deliberately not used: its bundled signing keys lag behind pnpm releases and the install fails.
+RUN npm install -g pnpm@10.28.0
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY packages/shared/package.json packages/shared/

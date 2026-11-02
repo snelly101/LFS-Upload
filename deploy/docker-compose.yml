@@ -1,4 +1,4 @@
-# Snelson Send – single-host deployment.
+# Together Housing Secure File Send – single-host deployment.
 # Only caddy publishes ports (80/443). Everything else lives on private networks.
 # Images are pinned by tag; see docs/UPGRADE.md for the update procedure.
 # The Docker socket is never mounted into any container.

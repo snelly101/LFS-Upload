@@ -1,7 +1,7 @@
-# Snelson Send – architecture
+# Together Housing Secure File Send – architecture
 
-Working name: **Snelson Send** (configurable in Branding settings). Single-organisation,
-self-hosted large-file dispatch application for Snelsonserver Ltd.
+Product name: **Together Housing Secure File Send** (configurable in Branding settings). Single-organisation,
+self-hosted large-file dispatch application for Together Housing.
 
 ## 1. Stack and tradeoffs
 

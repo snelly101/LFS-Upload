@@ -25,7 +25,7 @@ export function Shell({ width = 'narrow' }: { width?: 'narrow' | 'wide' }) {
       <header className="strip">
         <NavLink to={canSend ? '/' : '/activity'} className="strip-brand">
           {options?.logoDataUrl ? <img src={options.logoDataUrl} alt="" /> : <span className="mark" aria-hidden="true" />}
-          <span>{options?.productName ?? 'Snelson Send'}</span>
+          <span>{options?.productName ?? 'Together Housing Secure File Send'}</span>
         </NavLink>
         <nav className="strip-nav" aria-label="Main">
           {canSend && <NavLink to="/" end>Send</NavLink>}

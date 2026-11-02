@@ -1,6 +1,6 @@
 # Privacy and data-protection decisions still required
 
-The application provides controls; it does not make Snelsonserver Ltd compliant with UK GDPR by itself.
+The application provides controls; it does not make Together Housing compliant with UK GDPR by itself.
 Decisions an accountable person must take and record:
 
 1. **Lawful basis and purpose** for processing recipient email addresses, sender identities, filenames and

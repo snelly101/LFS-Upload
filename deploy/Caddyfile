@@ -1,4 +1,4 @@
-# Caddy reverse proxy for Snelson Send. PUBLIC_HOST and ACME_EMAIL come from deploy/.env.
+# Caddy reverse proxy for Together Housing Secure File Send. PUBLIC_HOST and ACME_EMAIL come from deploy/.env.
 # Caddy streams request and response bodies by default (no temp-file buffering), so no plaintext
 # copy of uploads or downloads is written by the proxy. There is no request body size limit by
 # default; limits are enforced by the application (transfer policy + tus maxSize).

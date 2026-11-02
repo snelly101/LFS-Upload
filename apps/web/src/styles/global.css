@@ -1624,6 +1624,12 @@ dialog.dialog::backdrop {
   .strip-nav .lbl-long {
     display: none;
   }
+  .strip-brand span {
+    max-width: 38vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .content {
     padding: 16px 14px 48px;
   }

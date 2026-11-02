@@ -1,17 +1,17 @@
 # Microsoft Entra ID (OpenID Connect) setup
 
-Snelson Send uses the authorisation-code flow with PKCE, `state` and `nonce`, via `openid-client`
+Together Housing Secure File Send uses the authorisation-code flow with PKCE, `state` and `nonce`, via `openid-client`
 (`apps/api/src/auth/oidc.ts`). Issuer, audience (client id), tenant and allow lists are checked explicitly
 on every login in `validateClaims()`. Nothing is granted on the basis of an email domain.
 
 ## 1. App registration
 1. Entra admin centre → App registrations → **New registration**.
-   * Name: Snelson Send. Supported account types: **this organisational directory only** (single tenant).
+   * Name: Together Housing Secure File Send. Supported account types: **this organisational directory only** (single tenant).
    * Redirect URI (Web): `https://<PUBLIC_HOST>/api/auth/sso/callback` — must match `PUBLIC_URL` exactly.
 2. Certificates & secrets → **New client secret**. Copy the value now; it is only shown once. Set a reminder for its expiry.
 3. Token configuration → **Add groups claim** → Security groups → for ID tokens emit **Group ID**.
    Overage caveat: if a user is in more than 200 groups (150 for SAML) Entra omits the `groups` claim and
-   sets `_claim_names`/`_claim_sources` instead. Snelson Send does **not** follow the Graph overage link;
+   sets `_claim_names`/`_claim_sources` instead. Together Housing Secure File Send does **not** follow the Graph overage link;
    such users will be rejected as "not in the allow list" unless they are listed by object id, or you
    restrict the claim to "groups assigned to the application" (Enterprise application → Users and groups,
    then choose that option in Token configuration).
@@ -21,15 +21,15 @@ on every login in `validateClaims()`. Nothing is granted on the basis of an emai
 
 ## 2. Conditional Access (MFA)
 The application cannot prove that MFA happened unless the IdP says so. Create a Conditional Access policy
-targeting the Snelson Send enterprise application that **requires multifactor authentication** (or an
-authentication strength) for all assigned users. Then in Snelson Send → Administration → Identity &
+targeting the Together Housing Secure File Send enterprise application that **requires multifactor authentication** (or an
+authentication strength) for all assigned users. Then in Together Housing Secure File Send → Administration → Identity &
 access enable **Require `amr` to contain `mfa`** so logins whose ID token does not report MFA are
 rejected. Note: `amr` reporting depends on the IdP and the method; if your tenant uses phishing-resistant
 methods that report differently, verify the claim content in a test login before enabling the check.
 `acr_values` can be set if your tenant uses authentication context; otherwise leave it blank and rely on
 Conditional Access.
 
-## 3. Configure Snelson Send
+## 3. Configure Together Housing Secure File Send
 Administration → Identity & access (requires recent strong authentication and a reason; the change is audited):
 
 | Field | Value |

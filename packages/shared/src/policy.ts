@@ -89,8 +89,8 @@ export const AuditPolicySchema = z.object({
 export type AuditPolicy = z.infer<typeof AuditPolicySchema>;
 
 export const BrandingSchema = z.object({
-  productName: z.string().min(1).max(60).default('Snelson Send'),
-  organisationName: z.string().min(1).max(120).default('Snelsonserver Ltd'),
+  productName: z.string().min(1).max(60).default('Together Housing Secure File Send'),
+  organisationName: z.string().min(1).max(120).default('Together Housing'),
   supportEmail: z.string().email().nullable().default(null),
   supportUrl: z.string().url().nullable().default(null),
   accentColour: z

@@ -24,7 +24,7 @@ export function AuthFrame({ children, title }: { children: React.ReactNode; titl
       <div className="auth-card">
         <div className="auth-brand">
           {options?.logoDataUrl ? <img src={options.logoDataUrl} alt="" /> : <span className="mark" aria-hidden="true" />}
-          <span>{options?.productName ?? 'Snelson Send'}</span>
+          <span>{options?.productName ?? 'Together Housing Secure File Send'}</span>
         </div>
         {title && <h1>{title}</h1>}
         {children}

@@ -21,7 +21,7 @@ const schema = z.object({
   /** Must match clamd.conf StreamMaxLength / MaxFileSize. Files above this are reported as not scanned. */
   CLAMD_MAX_STREAM_BYTES: z.coerce.number().int().default(4 * 1024 * 1024 * 1024 - 1),
   SMTP_URL: z.string().optional(),
-  SMTP_FROM: z.string().default('Snelson Send <send@localhost>'),
+  SMTP_FROM: z.string().default('Together Housing Secure File Send <send@localhost>'),
   MAIL_TRANSPORT: z.enum(['smtp', 'file', 'memory']).default('smtp'),
   MAIL_FILE_DIR: z.string().optional(),
   TRUST_PROXY: bool.default(false),

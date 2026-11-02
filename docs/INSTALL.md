@@ -1,6 +1,6 @@
 # Installation (Ubuntu 24.04 or 26.04 LTS, single host)
 
-This installs Snelson Send with Docker Compose: Caddy (TLS), API, worker, PostgreSQL 16 and an
+This installs Together Housing Secure File Send with Docker Compose: Caddy (TLS), API, worker, PostgreSQL 16 and an
 isolated ClamAV container. Only ports 80/443 are published. Expect downtime during upgrades; this
 is a deliberate single-host design (docs/OPERATIONS.md).
 

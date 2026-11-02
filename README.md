@@ -1,11 +1,11 @@
-# Snelson Send
+# Together Housing Secure File Send
 
-Self-hosted, single-organisation large-file dispatch for Snelsonserver Ltd. Staff upload files,
+Self-hosted, single-organisation large-file dispatch for Together Housing. Staff upload files,
 address them to named recipients, and send invitations; recipients prove control of their mailbox
 with a one-time code before downloading. Content lives only on your server, is quarantined and
 scanned before release, and is verifiably deleted at expiry.
 
-"Snelson Send" is a configurable working name (Administration → Branding).
+The product name, organisation name, logo and accent colour are configurable in Administration → Branding; the defaults are "Together Housing Secure File Send" / "Together Housing".
 
 | | |
 |---|---|

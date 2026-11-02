@@ -1,4 +1,4 @@
-# Installation (Ubuntu 24.04, single host)
+# Installation (Ubuntu 24.04 or 26.04 LTS, single host)
 
 This installs Snelson Send with Docker Compose: Caddy (TLS), API, worker, PostgreSQL 16 and an
 isolated ClamAV container. Only ports 80/443 are published. Expect downtime during upgrades; this
@@ -8,7 +8,7 @@ is a deliberate single-host design (docs/OPERATIONS.md).
 
 | Item | Minimum | Notes |
 |---|---|---|
-| OS | Ubuntu 24.04 LTS, x86-64 | kernel ≥ 6.8 |
+| OS | Ubuntu Server 26.04.1 LTS (recommended) or 24.04 LTS, x86-64, minimal install with OpenSSH | 26.04 is supported to 2031; Docker publishes packages for both. The installer was authored against 24.04; report any package-name difference. |
 | CPU / RAM | 4 vCPU / 8 GiB | ClamAV alone needs ~3 GiB resident; 16 GiB recommended |
 | System disk | 40 GiB | OS, Docker images, logs |
 | Content volume | see docs/OPERATIONS.md sizing | **LUKS-encrypted**, mounted at `/srv/snelson/content`, excluded from backups and snapshots |

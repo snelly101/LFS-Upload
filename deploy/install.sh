@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Idempotent first-time installation on Ubuntu 24.04. Run as root from the repository checkout:
+# Idempotent first-time installation on Ubuntu 24.04 LTS or 26.04 LTS (Docker repo channel is chosen from the release codename). Run as root from the repository checkout:
 #   sudo deploy/install.sh admin@example.com
 # Prerequisites that this script does NOT do for you (see docs/INSTALL.md):
 #   - DNS A/AAAA record for PUBLIC_HOST pointing at this server, ports 80/443 reachable

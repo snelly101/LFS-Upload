@@ -16,6 +16,9 @@
 }
 
 {$PUBLIC_HOST} {
+	# Certificate source: deploy/caddy/tls-<TLS_MODE>.caddy (acme | internal | custom), chosen in deploy/.env.
+	import /etc/caddy/tls-{$TLS_MODE}.caddy
+
 	encode zstd gzip
 
 	header {

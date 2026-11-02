@@ -1,0 +1,3 @@
+# TLS_MODE=custom: use your own certificate (internal CA or purchased). Mount the files into the caddy
+# service at the paths below (see the commented volumes in docker-compose.yml) and keep them readable by Caddy.
+tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem

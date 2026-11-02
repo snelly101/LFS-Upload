@@ -1,0 +1,2 @@
+# TLS_MODE=acme (default): Caddy obtains and renews a publicly trusted certificate from Let's Encrypt.
+# Requires DNS for PUBLIC_HOST to point at this server and ports 80 and 443 reachable from the internet.

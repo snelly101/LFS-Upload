@@ -21,6 +21,22 @@ Caddy obtains and renews certificates automatically via Let's Encrypt (`ACME_EMA
 internal CA, replace the `tls` directive in `deploy/Caddyfile` with `tls /etc/caddy/cert.pem /etc/caddy/key.pem`
 and mount the files. TLS 1.2+ only is Caddy's default.
 
+### 1.1a Testing before the site is public (LAN only)
+Set `TLS_MODE=internal` in `deploy/.env` and run `docker compose up -d caddy`. Caddy then issues a
+certificate from its own local CA instead of Let's Encrypt. On each device you test from:
+
+1. Point the hostname at the server if public DNS is not set yet: add `10.x.x.x securesend.example.com`
+   to the hosts file (`C:\Windows\System32\drivers\etc\hosts` on Windows, `/etc/hosts` elsewhere).
+2. Trust Caddy's root certificate so the browser treats the site as secure (required for passkeys):
+   `docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt ./securesend-local-root.crt`,
+   copy it to the device and import it into the Trusted Root Certification Authorities store
+   (Windows: double-click → Install Certificate → Local Machine → Trusted Root Certification Authorities).
+3. Browse to `https://securesend.example.com`.
+
+When the DMZ rules for inbound 80/443 are in place and DNS is public, set `TLS_MODE=acme` and run
+`docker compose up -d caddy`; Caddy obtains the public certificate within a minute. Remove the hosts-file
+entries and the test root certificate afterwards.
+
 ### 1.2 Disk layout and encryption at rest
 Content and database volumes must be separate block devices (or LVM volumes) encrypted with LUKS2.
 Volume encryption protects powered-off or removed storage. It does **not** isolate content from a

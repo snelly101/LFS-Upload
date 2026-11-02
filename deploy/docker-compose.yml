@@ -52,8 +52,15 @@ services:
     environment:
       PUBLIC_HOST: ${PUBLIC_HOST}
       ACME_EMAIL: ${ACME_EMAIL}
+      TLS_MODE: ${TLS_MODE:-acme}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy:/etc/caddy/caddy:ro
+      - ./caddy/tls-acme.caddy:/etc/caddy/tls-acme.caddy:ro
+      - ./caddy/tls-internal.caddy:/etc/caddy/tls-internal.caddy:ro
+      - ./caddy/tls-custom.caddy:/etc/caddy/tls-custom.caddy:ro
+      # For TLS_MODE=custom, also mount your certificate and key:
+      # - /etc/securesend/certs:/etc/caddy/certs:ro
       - caddy_data:/data
       - caddy_config:/config
     cap_drop: [ALL]

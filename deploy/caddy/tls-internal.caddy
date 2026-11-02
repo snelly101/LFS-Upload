@@ -1,0 +1,5 @@
+# TLS_MODE=internal: Caddy issues the certificate from its own local CA. Use for LAN-only testing
+# before the site is reachable from the internet. Trust the CA on each test device (docs/INSTALL.md §1.1a):
+#   docker compose cp caddy:/data/caddy/pki/authorities/local/root.crt ./securesend-local-root.crt
+# Switch back by setting TLS_MODE=acme in deploy/.env and running: docker compose up -d caddy
+tls internal

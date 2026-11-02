@@ -37,7 +37,7 @@ export function LoginPage() {
   const { options, me, refresh } = useAuth();
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const next = params.get('next') && params.get('next')!.startsWith('/') ? params.get('next')! : '/transfers';
+  const next = params.get('next') && params.get('next')!.startsWith('/') ? params.get('next')! : '/';
   const [stage, setStage] = useState<Stage>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

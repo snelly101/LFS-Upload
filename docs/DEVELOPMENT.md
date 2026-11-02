@@ -63,3 +63,18 @@ See docs/TEST-EVIDENCE.md for what is covered and the recorded results.
 ## Layout
 `apps/api` Fastify API + worker + CLI; `apps/web` React/Vite UI; `packages/shared` policy schemas and
 view types; `deploy/` Compose and runbooks; `docs/` design and operations; `tests/e2e` browser tests.
+
+## One-command dev stack (this container)
+
+`scripts/dev-up.sh` starts PostgreSQL, a clamd with the EICAR-only test signature, the API, the worker
+and the Vite dev server. `scripts/screenshots.mjs` drives the real UI with Playwright and refreshes
+`docs/screenshots/`. Note the login endpoints are rate-limited (15 MFA attempts per 15 minutes per
+address); restarting the API (`scripts/dev-api.sh start`) clears the in-memory limiter.
+
+## UI structure
+
+Sending is the home page (`apps/web/src/pages/Home.tsx`): files first, then "To", then an editable
+sentence of access rules (`components/Picker.tsx`). "Sent" (`pages/Sent.tsx`) lists past transfers;
+the detail page (`pages/TransferDetail.tsx`) leads with a plain-English status sentence and a
+three-step strip per recipient (`components/Steps.tsx`). The admin console lives under `/admin`.
+Old routes `/transfers`, `/transfers/new` and `/transfers/:id` redirect.

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { get, post, put, errorMessage } from '../api';
 import { fmt } from '../lib/time';
 import { useAuth } from '../auth/AuthContext';
-import { prefLabel } from './TransferDetail';
+import { prefLabel } from '../lib/labels';
 
 interface Item {
   id: number;
@@ -58,7 +58,7 @@ export function NotificationsPage() {
                 <div>
                   {n.title}
                   {n.body && <div className="who">{n.body}</div>}
-                  {n.transferId && <div className="small"><Link to={`/transfers/${n.transferId}`}>Open transfer</Link></div>}
+                  {n.transferId && <div className="small"><Link to={`/sent/${n.transferId}`}>Open transfer</Link></div>}
                 </div>
               </li>
             ))}

@@ -67,7 +67,7 @@ export function ActivityPage() {
                 <td>{eventLabel(e.eventType)}<div className="small muted mono">{e.eventType}</div></td>
                 <td className="small">{e.actorEmail ?? e.actorKind}{e.ipPrefix ? <div className="muted">{e.ipPrefix}</div> : null}</td>
                 <td className="small" style={{ color: e.outcome === 'denied' || e.outcome === 'failure' ? 'var(--red)' : undefined }}>{e.outcome}</td>
-                <td className="small mono">{e.transferId ? <a href={`/transfers/${e.transferId}`}>{e.transferId.slice(0, 8)}</a> : '—'}</td>
+                <td className="small mono">{e.transferId ? <a href={`/sent/${e.transferId}`}>{e.transferId.slice(0, 8)}</a> : '—'}</td>
                 <td className="small" style={{ maxWidth: 360, overflowWrap: 'anywhere' }}>{summarise(e.details)}</td>
               </tr>
             ))}

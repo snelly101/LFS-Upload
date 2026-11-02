@@ -16,9 +16,9 @@ Test ids refer to `apps/api/src/test/NN-*.test.ts` and `tests/e2e/specs/*.spec.t
 |---|---|---|
 | Tokens, system font, restrained UI, no purple gradients/glass/stock art | Done | `apps/web/src/styles/global.css`, screenshots |
 | Desktop shell: narrow nav, compact top bar, New transfer action | Done | `apps/web/src/components/Shell.tsx` |
-| Transfer table with filters/search | Done | `apps/web/src/pages/Transfers.tsx` |
+| Transfer table with filters/search | Done | `apps/web/src/pages/Sent.tsx` |
 | Detail: files + recipient progress, side panel policy + receipt | Done | `apps/web/src/pages/TransferDetail.tsx` |
-| Two-column composer with chips, expiry, prefs, plain-English summary | Done | `apps/web/src/pages/NewTransfer.tsx` |
+| Two-column composer with chips, expiry, prefs, plain-English summary | Done | `apps/web/src/pages/Home.tsx` |
 | Recipient page: branded, no shell, nothing before authorisation | Done | `apps/web/src/pages/Recipient.tsx`, `apps/api/src/routes/recipient.ts`, test 17 |
 | All states incl. deletion pending/failed/deleted vs expired | Done | `apps/web/src/components/Status.tsx` |
 | UK English, UTC storage, Europe/London display, absolute + countdown | Done | `packages/shared/src/format.ts`, `apps/web/src/lib/time.ts` |
@@ -30,7 +30,7 @@ Test ids refer to `apps/api/src/test/NN-*.test.ts` and `tests/e2e/specs/*.spec.t
 | SSO or local + MFA sign-in | Done / Done (untested externally for SSO) | `routes/auth.ts`, test 02, 03 |
 | Create transfer, files, title, message, recipients | Done | `services/transfers.ts` |
 | Expiry within limits, download limits, notifications | Done | `resolvePolicy()` in `services/transfers.ts`, test 16 |
-| Resumable upload with progress/speed/ETA/cancel | Done | tus (`routes/uploads.ts`), `pages/NewTransfer.tsx`, test 12 |
+| Resumable upload with progress/speed/ETA/cancel | Done | tus (`routes/uploads.ts`), `pages/Home.tsx`, test 12 |
 | Quarantine until scan passes; cannot send/download otherwise | Done | `worker/handlers.ts::scanFile`, `sendBlockers()`, test 11 |
 | Explicit send; upload alone never emails | Done | `sendTransfer()`; invitations queued only there; test 06/15 |
 | Per-recipient activity | Done | `transferDetail()` grants view + receipt |

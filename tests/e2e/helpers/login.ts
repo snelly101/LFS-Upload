@@ -12,13 +12,13 @@ export async function loginAs(page: Page, account: { email: string; password: st
   await code.fill(await freshTotpCode(account.totpSecret));
   await page.keyboard.press('Enter');
   try {
-    await page.waitForURL(/\/transfers/, { timeout: 10_000 });
+    await page.waitForURL((u) => ['/', '/activity'].includes(new URL(u).pathname), { timeout: 10_000 });
   } catch {
     // One-time code already used this step (e.g. by another process): wait for the next step and retry once.
     await new Promise((r) => setTimeout(r, 30_000 - (Date.now() % 30_000) + 500));
     await code.fill(await freshTotpCode(account.totpSecret));
     await page.keyboard.press('Enter');
-    await page.waitForURL(/\/transfers/, { timeout: 20_000 });
+    await page.waitForURL((u) => ['/', '/activity'].includes(new URL(u).pathname), { timeout: 20_000 });
   }
 }
 export const loginAsAdmin = (page: Page) => loginAs(page, ADMIN);

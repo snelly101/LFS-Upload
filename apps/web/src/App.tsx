@@ -1,10 +1,10 @@
-import { Navigate, Route, Routes } from 'react-router';
-import { AuthProvider } from './auth/AuthContext';
+import { Navigate, Route, Routes, useParams } from 'react-router';
+import { AuthProvider, useAuth } from './auth/AuthContext';
 import { Shell } from './components/Shell';
 import { LoginPage } from './pages/Login';
 import { ForgotPasswordPage, InvitePage, ResetPasswordPage } from './pages/AccountPages';
-import { TransfersPage } from './pages/Transfers';
-import { NewTransferPage } from './pages/NewTransfer';
+import { HomePage } from './pages/Home';
+import { SentPage } from './pages/Sent';
 import { TransferDetailPage } from './pages/TransferDetail';
 import { ActivityPage } from './pages/Activity';
 import { NotificationsPage } from './pages/Notifications';
@@ -14,12 +14,23 @@ import { AdminLayout } from './pages/admin/common';
 import { AuditSection, BrandingSection, IdentitySection, NotificationsSection, StorageSection, TransferPolicySection, VerificationSection } from './pages/admin/Settings';
 import { HealthPage } from './pages/admin/Health';
 import { UsersPage } from './pages/admin/Users';
-import { useAuth } from './auth/AuthContext';
 
 function AdminOnly({ children }: { children: React.ReactNode }) {
   const { me } = useAuth();
   if (me?.user?.role !== 'admin') return <div className="notice notice-err">Administrators only.</div>;
   return <>{children}</>;
+}
+
+/** Auditors have no composer; their home is the activity log. */
+function HomeForRole() {
+  const { me } = useAuth();
+  if (me?.user?.role === 'auditor') return <Navigate to="/activity" replace />;
+  return <HomePage />;
+}
+
+function LegacyTransferRedirect() {
+  const { id } = useParams();
+  return <Navigate to={id === 'new' ? '/' : `/sent/${id}`} replace />;
 }
 
 export function App() {
@@ -36,10 +47,11 @@ export function App() {
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route element={<Shell />}>
-                <Route index element={<Navigate to="/transfers" replace />} />
-                <Route path="/transfers" element={<TransfersPage />} />
-                <Route path="/transfers/new" element={<NewTransferPage />} />
-                <Route path="/transfers/:id" element={<TransferDetailPage />} />
+                <Route index element={<HomeForRole />} />
+                <Route path="/sent" element={<SentPage />} />
+                <Route path="/sent/:id" element={<TransferDetailPage />} />
+                <Route path="/transfers" element={<Navigate to="/sent" replace />} />
+                <Route path="/transfers/:id" element={<LegacyTransferRedirect />} />
                 <Route path="/activity" element={<ActivityPage />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/account/security" element={<SecurityPage />} />

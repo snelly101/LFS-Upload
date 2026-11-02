@@ -9,24 +9,29 @@ import { makeFixture, waitForMail } from '../helpers/env.js';
  */
 test('sender creates, uploads, scans and sends a transfer (keyboard navigation)', async ({ page }) => {
   await loginAsSender(page);
-  // Keyboard: Tab to the New transfer action from the top bar.
+  // Sending is the home page: the first Tab lands on the skip link, then the brand, then "Send".
+  await page.goto('/');
+  await page.getByText('Send files securely').waitFor();
   await page.keyboard.press('Tab');
-  const newTransfer = page.getByRole('link', { name: /new transfer/i }).first();
-  await newTransfer.focus();
-  await expect(newTransfer).toBeFocused();
+  await expect(page.locator('.skip-link')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Send', exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
-  await page.waitForURL(/\/transfers\/new/);
+  await page.waitForURL((u) => new URL(u).pathname === '/');
 
-  const title = page.getByLabel(/title/i);
-  await title.fill('E2E dispatch ' + Date.now());
-  const recipients = page.getByLabel(/recipient/i).first();
-  await recipients.fill('e2e-recipient@example.invalid');
-  await page.keyboard.press('Enter');
-  await expect(page.getByText('e2e-recipient@example.invalid')).toBeVisible();
-
+  // Files first: the composer appears once a file is chosen, and focus moves to "To".
   const fixture = makeFixture('e2e-document.bin', 2 * 1024 * 1024 + 11);
   await page.locator('input[type=file]').first().setInputFiles(fixture);
   await expect(page.getByText(/e2e-document\.bin/)).toBeVisible();
+  const recipients = page.getByLabel(/recipients/i).first();
+  await expect(recipients).toBeFocused();
+  await page.keyboard.type('e2e-recipient@example.invalid');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('e2e-recipient@example.invalid').first()).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(page.getByLabel(/title/i)).toBeFocused();
+  await page.keyboard.type('E2E dispatch ' + Date.now());
   // upload + scan: wait for the ready state in the UI (honest label), not a fake bar
   await expect(page.getByText(/ready to send|scan passed|clean/i).first()).toBeVisible({ timeout: 90_000 });
 
@@ -36,7 +41,7 @@ test('sender creates, uploads, scans and sends a transfer (keyboard navigation)'
   const send = page.getByRole('button', { name: /^send/i }).first();
   await send.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByText(/active|invitation/i).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/^Sent to /).first()).toBeVisible({ timeout: 30_000 });
 
   const mail = await waitForMail((t) => t.includes('e2e-recipient@example.invalid') && t.includes('has sent you'), 30_000, sentAt);
   expect(mail).toMatch(/\/r\/[A-Za-z0-9_-]{40,}/);

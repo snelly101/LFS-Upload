@@ -42,3 +42,13 @@ export function fromLocalInput(v: string): string {
   }
   return new Date(guess).toISOString();
 }
+
+/** Compact stamp for tight spaces: "14:02" today, otherwise "2 Nov". */
+export function fmtShort(iso: string | Date | null | undefined): string {
+  if (!iso) return '';
+  const d = typeof iso === 'string' ? new Date(iso) : iso;
+  const sameDay = new Intl.DateTimeFormat('en-GB', { timeZone: currentTz, dateStyle: 'short' }).format(d) === new Intl.DateTimeFormat('en-GB', { timeZone: currentTz, dateStyle: 'short' }).format(new Date());
+  return sameDay
+    ? new Intl.DateTimeFormat('en-GB', { timeZone: currentTz, hour: '2-digit', minute: '2-digit', hour12: false }).format(d)
+    : new Intl.DateTimeFormat('en-GB', { timeZone: currentTz, day: 'numeric', month: 'short' }).format(d);
+}

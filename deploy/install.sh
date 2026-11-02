@@ -38,7 +38,8 @@ if [ ! -f .env ]; then
   sed -i "s|^SERVER_SECRET_KEY=.*|SERVER_SECRET_KEY=$(openssl rand -base64 48)|" .env
   sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=')|" .env
   chmod 600 .env
-  echo "Created deploy/.env with generated secrets. Edit PUBLIC_HOST, PUBLIC_URL, ACME_EMAIL and SMTP settings, then re-run this script."
+  echo "Created $HERE/.env with generated secrets."
+  echo "Next: edit PUBLIC_HOST, PUBLIC_URL, ACME_EMAIL and SMTP settings in $HERE/.env, then run:  bash $HERE/install.sh [admin-email]"
   exit 0
 fi
 
@@ -49,4 +50,8 @@ docker compose up -d
 if [ -n "$ADMIN_EMAIL" ]; then
   docker compose run --rm --no-deps api node dist/cli.js bootstrap-admin "$ADMIN_EMAIL"
 fi
-echo "Done. Check: docker compose ps; curl -fsS https://$(grep ^PUBLIC_HOST= .env | cut -d= -f2)/readyz"
+echo "Done. All docker compose commands run from $HERE (cd $HERE first)."
+echo "Check:  docker compose ps   and   curl -fsS https://$(grep ^PUBLIC_HOST= .env | cut -d= -f2)/readyz"
+if [ -z "$ADMIN_EMAIL" ]; then
+  echo "Create the first administrator:  docker compose run --rm --no-deps api node dist/cli.js bootstrap-admin you@example.com"
+fi

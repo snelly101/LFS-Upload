@@ -1,5 +1,5 @@
 # Together Housing Secure File Send – single-host deployment.
-# Only caddy publishes ports (80/443). Everything else lives on private networks.
+# Only caddy publishes ports (80/443). Everything else lives on private networks; the database has no route out.
 # Images are pinned by tag; see docs/UPGRADE.md for the update procedure.
 # The Docker socket is never mounted into any container.
 
@@ -79,7 +79,7 @@ services:
   api:
     <<: *app-common
     command: ["node", "dist/server.js"]
-    networks: [frontend, backend]
+    networks: [frontend, backend, egress]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -100,7 +100,7 @@ services:
       CLAMD_HOST: clamav
       CLAMD_PORT: "3310"
       WORKER_ID: worker-1
-    networks: [backend]
+    networks: [backend, egress]
     healthcheck:
       test: ["CMD", "node", "-e", "process.exit(0)"]
       interval: 60s
@@ -142,7 +142,7 @@ services:
     volumes:
       - ./clamd.conf:/etc/clamav/clamd.conf:ro
       - clamav_db:/var/lib/clamav
-    networks: [backend]
+    networks: [backend, egress]
     healthcheck:
       test: ["CMD", "clamdcheck.sh"]
       interval: 60s
@@ -175,9 +175,14 @@ services:
 networks:
   frontend:
     driver: bridge
+  # backend is internal: the database can never reach the internet.
   backend:
     driver: bridge
     internal: true
+  # egress carries only the outbound traffic the design requires: SMTP (api test-send, worker),
+  # IdP discovery/token exchange (api) and ClamAV signature downloads (clamav).
+  egress:
+    driver: bridge
 
 volumes:
   caddy_data:

@@ -75,6 +75,8 @@ const LABELS: Record<string, string> = {
   'admin.smtp_test': 'SMTP test',
   'admin.alert_resolved': 'Alert resolved',
   'admin.backup_verified': 'Backup verification recorded',
+  'admin.outbox_discarded': 'Failed email discarded',
+  'admin.dead_jobs_discarded': 'Dead jobs discarded',
 };
 export function eventLabel(type: string): string {
   return LABELS[type] ?? type;

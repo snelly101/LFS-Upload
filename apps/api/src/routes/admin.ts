@@ -277,6 +277,19 @@ export async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
     return { ok: true };
   });
 
+  /** Housekeeping: acknowledge email that failed permanently and jobs that exhausted retries. */
+  app.post('/api/admin/outbox/discard-failed', admin, async (req) => {
+    const r = await ctx.db.query(`UPDATE outbox_messages SET status = 'suppressed', last_error = COALESCE(last_error, '') || ' [discarded by administrator]' WHERE status = 'failed'`);
+    await audit(ctx.db, { ...actor(req), eventType: 'admin.outbox_discarded', details: { count: r.rowCount ?? 0 } });
+    return { discarded: r.rowCount ?? 0 };
+  });
+  app.post('/api/admin/jobs/discard-dead', admin, async (req) => {
+    const r = await ctx.db.query(`UPDATE jobs SET state = 'done', finished_at = now(), last_error = COALESCE(last_error, '') || ' [discarded by administrator]' WHERE state = 'dead'`);
+    await ctx.db.query(`UPDATE operational_alerts SET resolved_at = now() WHERE kind = 'job_dead' AND resolved_at IS NULL`);
+    await audit(ctx.db, { ...actor(req), eventType: 'admin.dead_jobs_discarded', details: { count: r.rowCount ?? 0 } });
+    return { discarded: r.rowCount ?? 0 };
+  });
+
   app.post('/api/admin/backup-verified', adminRecent, async (req) => {
     const { note } = z.object({ note: z.string().max(500).default('') }).parse(req.body ?? {});
     const s = await ctx.settings.get('storage');

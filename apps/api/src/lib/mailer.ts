@@ -66,7 +66,8 @@ export class SmtpMailer implements Mailer {
 
   private async getTransport(): Promise<{ t: Transporter; from: string; replyTo?: string }> {
     const s = await this.settings.get('smtp');
-    const password = s.passwordSet ? await this.settings.getSecret('smtp.password') : null;
+    // Always read the stored secret rather than trusting the derived flag.
+    const password = await this.settings.getSecret('smtp.password');
     const sig = JSON.stringify([s.host, s.port, s.secure, s.username, password ? password.length : 0, this.config.SMTP_URL]);
     if (!this.transport || sig !== this.signature) {
       if (s.host) {

@@ -49,9 +49,10 @@ export async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
         if (!tested) throw badRequest('Run a successful SSO test before enforcing SSO', 'sso_untested');
       }
       // Preserve secret-set flags; they are derived.
-      if (v.oidc) (v.oidc as Record<string, unknown>).clientSecretSet = (before as typeof v).oidc && !!(await ctx.settings.getSecret('oidc.clientSecret'));
+      // "secret set" flags are derived: existing stored secret, or one supplied in this same request.
+      if (v.oidc) (v.oidc as Record<string, unknown>).clientSecretSet = !!body.secrets?.clientSecret || !!(await ctx.settings.getSecret('oidc.clientSecret'));
     }
-    if (section === 'smtp') (value as { passwordSet?: boolean }).passwordSet = !!(await ctx.settings.getSecret('smtp.password'));
+    if (section === 'smtp') (value as { passwordSet?: boolean }).passwordSet = !!body.secrets?.password || !!(await ctx.settings.getSecret('smtp.password'));
     const saved = await ctx.db.tx(async (c) => {
       const parsed = await ctx.settings.save(c, section, value as never, req.auth!.user.id);
       if (body.secrets) {

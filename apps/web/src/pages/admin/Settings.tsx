@@ -167,7 +167,19 @@ export function NotificationsSection() {
   const [kind, setKind] = useState('transfer_available');
   const [preview, setPreview] = useState<{ subject: string; text: string; html: string } | null>(null);
   const kinds = ['transfer_available', 'verification_code', 'sender_activity', 'expiring_soon_recipient', 'account_invite', 'password_reset', 'security_notice', 'admin_alert', 'test_message'];
-  const sendTest = () => withStepUp(() => post<{ ok: boolean; response?: string; error?: string }>('/api/admin/settings/smtp/test', { to })).then((r) => setRes(r.ok ? `Accepted by server: ${r.response}` : `Failed: ${r.error}`)).catch((e) => setRes(errorMessage(e)));
+  const [testing, setTesting] = useState(false);
+  const sendTest = async () => {
+    setTesting(true);
+    setRes('Connecting to the mail server… this can take up to 45 seconds if the connection is being blocked.');
+    try {
+      const r = await withStepUp(() => post<{ ok: boolean; response?: string; error?: string }>('/api/admin/settings/smtp/test', { to }));
+      setRes(r.ok ? `Accepted by the mail server: ${r.response ?? 'OK'}. Check the inbox (and spam folder) of ${to}.` : `Failed: ${r.error}`);
+    } catch (e) {
+      setRes(`Failed: ${errorMessage(e)}`);
+    } finally {
+      setTesting(false);
+    }
+  };
   return (
     <>
       <SectionForm
@@ -216,9 +228,9 @@ export function NotificationsSection() {
         <div className="row">
           <label htmlFor="t-to" className="visually-hidden">Send test to</label>
           <input id="t-to" className="input" type="email" placeholder="Send a test message to…" value={to} onChange={(e) => setTo(e.target.value)} style={{ maxWidth: 320 }} />
-          <button className="btn" onClick={() => void sendTest()} disabled={!to}>Send test</button>
+          <button className="btn" onClick={() => void sendTest()} disabled={!to || testing}>{testing ? 'Sending…' : 'Send test'}</button>
         </div>
-        {res && <div className="notice notice-info" role="status" style={{ marginTop: 10 }}>{res}</div>}
+        {res && <div className={`notice ${res.startsWith('Failed') ? 'notice-err' : 'notice-info'}`} role="status" style={{ marginTop: 10 }}>{res}</div>}
         <hr className="divider" />
         <div className="row">
           <label htmlFor="t-kind">Template</label>

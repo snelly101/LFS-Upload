@@ -8,7 +8,7 @@ type Stage = 'password' | 'mfa' | 'enrol' | 'enrol-totp' | 'enrol-passkey' | 're
 
 const SSO_ERRORS: Record<string, string> = {
   sso_state: 'The sign-in attempt expired. Please try again.',
-  sso_not_allowed: 'Your account is not in the allowed users or groups for this application. Ask an administrator.',
+  sso_not_allowed: 'Your account is not in the allowed users or groups for this application. An administrator can see which groups the sign-in carried under Activity → "SSO sign-in rejected".',
   sso_tenant_mismatch: 'Sign-in came from a tenant that is not trusted by this application.',
   sso_issuer_mismatch: 'The identity provider did not match the configured issuer.',
   sso_audience_mismatch: 'The token was not issued for this application.',

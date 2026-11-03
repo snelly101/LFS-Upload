@@ -18,6 +18,8 @@ export class OidcError extends Error {
   constructor(
     message: string,
     public readonly reason: string,
+    /** Non-secret diagnostic facts for the audit log (never tokens or secrets). */
+    public readonly details: Record<string, unknown> = {},
   ) {
     super(message);
   }
@@ -114,7 +116,7 @@ export function validateClaims(claims: Record<string, unknown>, settings: Identi
   const audOk = Array.isArray(aud) ? aud.includes(o.clientId) : aud === o.clientId;
   if (!audOk) throw new OidcError('Audience mismatch', 'audience_mismatch');
   const tid = typeof claims.tid === 'string' ? claims.tid : null;
-  if (o.tenantId && tid !== o.tenantId) throw new OidcError('Tenant not allowed', 'tenant_mismatch');
+  if (o.tenantId && tid !== o.tenantId) throw new OidcError('Tenant not allowed', 'tenant_mismatch', { tenantInToken: tid });
   const oid = typeof claims.oid === 'string' ? claims.oid : null;
   const sub = typeof claims.sub === 'string' ? claims.sub : null;
   const subject = oid ?? sub;
@@ -124,7 +126,16 @@ export function validateClaims(claims: Record<string, unknown>, settings: Identi
   const groupAllowed = o.allowedGroupIds.some((g) => groups.includes(g));
   const adminAllowed = o.adminGroupIds.some((g) => groups.includes(g));
   const auditorAllowed = o.auditorGroupIds.some((g) => groups.includes(g));
-  if (!userAllowed && !groupAllowed && !adminAllowed && !auditorAllowed) throw new OidcError('User is not in the allow list', 'not_allowed');
+  if (!userAllowed && !groupAllowed && !adminAllowed && !auditorAllowed) {
+    throw new OidcError('User is not in the allow list', 'not_allowed', {
+      subject,
+      tenantId: tid,
+      groupsClaimPresent: Array.isArray(claims.groups),
+      groupsInToken: groups,
+      groupOverage: !!claims._claim_names,
+      configuredGroupIds: [...o.allowedGroupIds, ...o.adminGroupIds, ...o.auditorGroupIds],
+    });
+  }
   const amr = Array.isArray(claims.amr) ? (claims.amr as unknown[]).filter((a): a is string => typeof a === 'string') : [];
   if (o.requireAmrMfa && !amr.includes('mfa')) throw new OidcError('IdP did not report multi-factor authentication', 'mfa_not_reported');
   const email = typeof claims.preferred_username === 'string' ? claims.preferred_username : typeof claims.email === 'string' ? claims.email : null;

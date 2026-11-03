@@ -428,7 +428,7 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext) {
       return reply.redirect('/', 302);
     } catch (e) {
       const reason = e instanceof OidcError ? e.reason : 'error';
-      await audit(ctx.db, { ...actor(req), actorKind: 'anonymous', eventType: 'auth.sso_rejected', outcome: 'denied', details: { reason, message: e instanceof Error ? e.message : String(e) } });
+      await audit(ctx.db, { ...actor(req), actorKind: 'anonymous', eventType: 'auth.sso_rejected', outcome: 'denied', details: { reason, message: e instanceof Error ? e.message : String(e), ...(e instanceof OidcError ? e.details : {}) } });
       ctx.log.warn({ reason }, 'SSO login rejected');
       return reply.redirect(`/login?error=sso_${reason}`, 302);
     }

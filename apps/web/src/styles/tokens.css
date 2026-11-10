@@ -40,7 +40,7 @@
   --shadow: 0 1px 0 rgba(29, 42, 46, 0.04);
   --pop-shadow: 0 10px 28px rgba(29, 42, 46, 0.16);
   --font-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
-  --font-text: 'Atkinson Hyperlegible Next', 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-text: 'Public Sans', 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --display-weight: 560;
   --display-tracking: -0.012em;

@@ -44,12 +44,20 @@ test('recipient verifies by email code and downloads on mobile', async ({ page, 
   const codeMailsBefore = countMail(isCodeMail);
 
   // Act: open the link. Nothing sensitive before verification, and no code is sent automatically.
+  const tokenFetches: string[] = [];
+  const pageErrors: string[] = [];
+  page.on('request', (r) => { if (/\/api\/r\/[^/]+$/.test(new URL(r.url()).pathname)) tokenFetches.push(r.method()); });
+  page.on('pageerror', (e) => pageErrors.push(String(e)));
   await page.goto(link);
   await expect(page.getByRole('button', { name: /email me a code|send.*code/i })).toBeVisible();
+  // The organisation's chosen look is applied from the public view, before any verification.
+  await expect(page.locator('html')).toHaveAttribute('data-theme', /^(civic|clear)$/);
   await expect(page.getByText('Mobile recipient test')).toHaveCount(0);
   await expect(page.getByText('photo-set.bin')).toHaveCount(0);
   await page.waitForTimeout(1500);
   expect(countMail(isCodeMail)).toBe(codeMailsBefore);
+  // Opening the link looks the transfer up exactly once (mail scanners must not be able to burn anything).
+  expect(tokenFetches).toEqual(['GET']);
 
   await page.getByRole('button', { name: /email me a code|send.*code/i }).click();
   const requestedAt = Date.now();
@@ -66,6 +74,8 @@ test('recipient verifies by email code and downloads on mobile', async ({ page, 
   const path = await download.path();
   expect(path).toBeTruthy();
   expect(fs.statSync(path!).size).toBe(bytes.length);
+
+  expect(pageErrors).toEqual([]);
 
   // Server-side completion recorded (not just the click): sender sees the completed download.
   let last: unknown = null;

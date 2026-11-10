@@ -159,8 +159,8 @@ export function currentScheme(): Scheme {
 /** Static colours for the Branding preview panes (kept in step with tokens.css). */
 export const PREVIEW: Record<ThemeName, Record<Scheme, { paper: string; surface: string; ink: string; muted: string; line: string; display: string; text: string }>> = {
   civic: {
-    light: { paper: '#f4f0e8', surface: '#fffdf8', ink: '#1d2a2e', muted: '#636b66', line: '#dcd5c6', display: "'Fraunces', Georgia, serif", text: "'Atkinson Hyperlegible Next', system-ui, sans-serif" },
-    dark: { paper: '#16191a', surface: '#1f2324', ink: '#ece7dc', muted: '#9a968c', line: '#353b3c', display: "'Fraunces', Georgia, serif", text: "'Atkinson Hyperlegible Next', system-ui, sans-serif" },
+    light: { paper: '#f4f0e8', surface: '#fffdf8', ink: '#1d2a2e', muted: '#636b66', line: '#dcd5c6', display: "'Fraunces', Georgia, serif", text: "'Public Sans', system-ui, sans-serif" },
+    dark: { paper: '#16191a', surface: '#1f2324', ink: '#ece7dc', muted: '#9a968c', line: '#353b3c', display: "'Fraunces', Georgia, serif", text: "'Public Sans', system-ui, sans-serif" },
   },
   clear: {
     light: { paper: '#f5f6f8', surface: '#ffffff', ink: '#14181f', muted: '#5f6775', line: '#dee2e8', display: "'Inter', system-ui, sans-serif", text: "'Inter', system-ui, sans-serif" },

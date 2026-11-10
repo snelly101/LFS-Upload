@@ -52,6 +52,9 @@ export function headline(t: { status: string; deletionStatus: string; expiresAt:
   if (active.length === 0) return 'No recipients with access.';
   if (done.length === active.length) return active.length === 1 ? `${name(done[0]!)} has downloaded everything.` : `All ${active.length} recipients have downloaded everything.`;
   if (done.length > 0) return `${done.length} of ${active.length} recipients have downloaded everything.`;
+  const part = active.filter((g) => !g.allFilesCompletedAt && g.filesCompleted > 0);
+  const total = t.files.filter((f) => f.storageState === 'released').length;
+  if (active.length === 1 && part.length === 1) return `${name(part[0]!)} has downloaded ${part[0]!.filesCompleted} of ${total} files.`;
   if (opened.length > 0) return active.length === 1 ? `${name(opened[0]!)} opened it but hasn't downloaded yet.` : `${opened.length} of ${active.length} recipients have opened it; none has downloaded everything yet.`;
   return active.length === 1 ? `Waiting for ${name(active[0]!)} to open it.` : `Waiting for recipients to open it.`;
 }

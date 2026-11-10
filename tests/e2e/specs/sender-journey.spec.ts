@@ -42,6 +42,9 @@ test('sender creates, uploads, scans and sends a transfer (keyboard navigation)'
   await send.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByText(/^Sent to /).first()).toBeVisible({ timeout: 30_000 });
+  // The confirmation is a dispatch ticket carrying the transfer's short reference.
+  await expect(page.locator('.ticket .stamp')).toHaveText(/sent/i);
+  await expect(page.locator('.ticket-stub')).toContainText(/Reference\s*[0-9A-F]{8}/i);
 
   const mail = await waitForMail((t) => t.includes('e2e-recipient@example.invalid') && t.includes('has sent you'), 30_000, sentAt);
   expect(mail).toMatch(/\/r\/[A-Za-z0-9_-]{40,}/);

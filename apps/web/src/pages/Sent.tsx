@@ -23,9 +23,14 @@ function Row({ t }: { t: TransferSummary }) {
   const unsent = ['draft', 'uploading', 'scanning', 'ready'].includes(t.status);
   const active = t.recipients.filter((r) => r.status !== 'revoked');
   const to = active.length === 0 ? 'No recipients yet' : active.length <= 2 ? active.map((r) => r.email).join(', ') : `${active[0]!.email} and ${active.length - 1} others`;
+  const gone = !unsent && !live;
   let stand = '';
-  if (unsent) stand = s.label === 'Ready to send' ? 'Ready to send' : s.label;
-  else if (active.length) stand = t.recipientsCompleted === active.length ? 'Everyone has downloaded everything' : t.recipientsCompleted > 0 ? `${t.recipientsCompleted} of ${active.length} downloaded everything` : t.downloadsCompleted > 0 ? 'Downloads in progress' : 'Nothing downloaded yet';
+  if (unsent) stand = s.label === 'Ready to send' ? 'Not sent yet. Open to finish.' : 'Not sent yet';
+  else if (!active.length) stand = 'No recipients with access';
+  else if (t.recipientsCompleted === active.length) stand = active.length === 1 ? 'Downloaded everything' : 'Everyone downloaded everything';
+  else if (t.recipientsCompleted > 0) stand = `${t.recipientsCompleted} of ${active.length} downloaded everything`;
+  else if (t.downloadsCompleted > 0) stand = gone ? 'Some files were downloaded' : 'Some files downloaded so far';
+  else stand = gone ? 'Nothing was downloaded' : 'Nothing downloaded yet';
   const tone = s.tone;
   return (
     <Link to={unsent ? `/?id=${t.id}` : `/sent/${t.id}`} className="sent-row">
@@ -107,10 +112,12 @@ export function SentPage() {
 }
 
 /** The last few sends, shown under the composer so the home page covers the everyday case. */
-export function RecentSends() {
+export function RecentSends({ excludeId }: { excludeId?: string } = {}) {
   const poll = usePollInterval(60_000);
-  const q = useQuery({ queryKey: ['transfers', 'recent'], queryFn: () => get<{ items: TransferSummary[]; total: number }>('/api/transfers?pageSize=5'), refetchInterval: poll });
-  const items = (q.data?.items ?? []).slice(0, 5);
+  const q = useQuery({ queryKey: ['transfers', 'recent'], queryFn: () => get<{ items: TransferSummary[]; total: number }>('/api/transfers?pageSize=8'), refetchInterval: poll });
+  // Drafts that were discarded before sending are history for the Sent page, not something to show on the way in.
+  const discarded = (t: TransferSummary) => !t.sentAt && ['deleted', 'deleting', 'expired', 'revoked'].includes(t.status);
+  const items = (q.data?.items ?? []).filter((t) => t.id !== excludeId && !discarded(t)).slice(0, 5);
   if (!items.length) return null;
   return (
     <section aria-labelledby="recent-h">

@@ -684,7 +684,7 @@ export function HomePage() {
 
           <div className="composer-foot">
             <div className="sentence" style={{ margin: 0, width: '100%' }}>
-              Available for{' '}
+              {expiryPreset === 'custom' ? 'Available until' : 'Available for'}{' '}
               <Picker<ExpiryPreset>
                 ariaLabel="How long the files are available"
                 value={expiryPreset}
@@ -752,7 +752,7 @@ export function HomePage() {
       {policy && (policy.quota.usedBytes + policy.quota.reservedBytes) / Math.max(1, policy.quota.quotaBytes) > 0.8 && (
         <p className="small muted">You have used {formatBytes(policy.quota.usedBytes + policy.quota.reservedBytes)} of your {formatBytes(policy.quota.quotaBytes, 0)} storage. Space is freed when transfers expire.</p>
       )}
-      {me?.user && <RecentSends />}
+      {me?.user && <RecentSends excludeId={transfer?.id} />}
     </div>
   );
 }

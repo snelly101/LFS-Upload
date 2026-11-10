@@ -28,47 +28,71 @@ export function HealthPage() {
   const q = useQuery({ queryKey: ['admin-health'], queryFn: () => get<Health>('/api/admin/health'), refetchInterval: 30_000 });
   const [note, setNote] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
-  if (!q.data) return <p>{q.isError ? errorMessage(q.error) : 'Loading…'}</p>;
+  if (!q.data) return <div className="loading" role="status">{q.isError ? errorMessage(q.error) : 'Loading…'}</div>;
   const h = q.data;
   const pctFree = (h.disk.availableBytes / h.disk.totalBytes) * 100;
   const workerAlive = h.workers.some((w) => w.alive);
   const dead = h.jobs.filter((j) => j.state === 'dead').reduce((n, j) => n + j.n, 0);
   const queued = h.jobs.filter((j) => j.state === 'queued').reduce((n, j) => n + j.n, 0);
   const refresh = () => void qc.invalidateQueries({ queryKey: ['admin-health'] });
+  const problems = [!h.scanner.ok, !workerAlive, h.deletion.failed > 0, h.smtp.failed > 0, !h.auditChain.ok, dead > 0].filter(Boolean).length + h.alerts.length;
   return (
     <>
-      <div className="card-head"><h2>System health</h2><span className="small muted">Server time {fmt(h.now)} · liveness /healthz · readiness /readyz</span></div>
+      <div className="page-head">
+        <div>
+          <h1>{problems === 0 ? 'Everything is working' : `${problems} thing${problems === 1 ? '' : 's'} need${problems === 1 ? 's' : ''} attention`}</h1>
+          <p>Checked {fmt(h.now)} · refreshes every 30 seconds</p>
+        </div>
+        <span className={`stamp lg ${problems === 0 ? 'stamp-ok' : 'stamp-warn'}`}>{problems === 0 ? 'Healthy' : 'Check'}</span>
+      </div>
       {h.alerts.length > 0 && (
-        <section className="card" aria-labelledby="al-h">
-          <h2 id="al-h">Open alerts</h2>
-          <ul className="stack" style={{ listStyle: 'none', padding: 0 }}>
-            {h.alerts.map((a) => (
-              <li key={a.id} className={`notice ${a.severity === 'critical' ? 'notice-err' : 'notice-warn'}`} style={{ margin: 0 }}>
-                <div className="row-between"><span><strong style={{ display: 'inline' }}>{a.severity}</strong> · {a.message} <span className="muted small">({fmt(a.created_at)})</span></span><button className="btn btn-sm" onClick={() => void post(`/api/admin/alerts/${a.id}/resolve`).then(refresh)}>Mark resolved</button></div>
-              </li>
-            ))}
-          </ul>
+        <section aria-labelledby="al-h" style={{ marginBottom: 18 }}>
+          <h2 id="al-h" className="section-h" style={{ marginTop: 0 }}>Open alerts</h2>
+          {h.alerts.map((a) => (
+            <div key={a.id} className={`notice ${a.severity === 'critical' ? 'notice-err' : 'notice-warn'}`} style={{ marginBottom: 8 }}>
+              <div className="alert-row">
+                <span><strong style={{ display: 'inline' }}>{a.severity === 'critical' ? 'Critical' : 'Warning'}</strong> · {a.message} <span className="muted small">{fmt(a.created_at)}</span></span>
+                <button className="btn btn-sm" onClick={() => void post(`/api/admin/alerts/${a.id}/resolve`).then(refresh)}>Mark resolved</button>
+              </div>
+            </div>
+          ))}
         </section>
       )}
       <div className="stat-grid">
-        <div className="stat"><span className="label">Content storage</span><span className="value">{pctFree.toFixed(1)}% free</span><div className="small muted">{formatBytes(h.disk.availableBytes)} of {formatBytes(h.disk.totalBytes)} · content {formatBytes(h.disk.usedByContent)} · reserved {formatBytes(h.disk.reserved)}</div><div className="small mono muted">{h.disk.contentRoot}</div></div>
-        <div className="stat"><span className="label">Malware scanner</span><span className="value">{h.scanner.ok ? <Badge tone="ok" label="Reachable" /> : <Badge tone="err" label="Unreachable" />}</span><div className="small muted">{h.scanner.version ?? h.scanner.error} · limit {formatBytes(h.scanner.maxStreamBytes, 0)}</div><div className="small muted">{h.scans.pending} awaiting scan · {h.scans.failed} failed (24h)</div></div>
-        <div className="stat"><span className="label">Worker</span><span className="value">{workerAlive ? <Badge tone="ok" label="Heartbeat OK" /> : <Badge tone="err" label="No heartbeat" />}</span><div className="small muted">{h.workers.map((w) => `${w.id}: ${fmt(w.lastSeen)}`).join(' · ') || 'no worker has ever reported'}</div><div className="small muted">{queued} queued · {dead} dead jobs{dead > 0 && <> · <button className="btn-link" onClick={() => void post('/api/admin/jobs/discard-dead').then(refresh)}>discard dead jobs</button></>}</div></div>
-        <div className="stat"><span className="label">Deletion</span><span className="value">{h.deletion.failed > 0 ? <Badge tone="err" label={`${h.deletion.failed} failed`} /> : h.deletion.pending > 0 ? <Badge tone="warn" label={`${h.deletion.pending} pending`} /> : <Badge tone="ok" label="No backlog" />}</span><div className="small muted">Oldest overdue: {h.deletion.oldest ? fmt(h.deletion.oldest) : 'none'} · target {h.deletion.targetMinutes} min</div><div className="small muted">{h.deletion.completed24h} completed (24h) · avg {h.deletion.avgSeconds !== null ? formatDuration(h.deletion.avgSeconds) : '—'} (7d)</div></div>
-        <div className="stat"><span className="label">Uploads</span><span className="value">{h.uploads.active} active</span><div className="small muted">{h.uploads.failed24h} abandoned (24h) · {h.activeStreams} active download streams</div></div>
-        <div className="stat"><span className="label">Email</span><span className="value">{h.smtp.failed > 0 ? <Badge tone="err" label={`${h.smtp.failed} failed`} /> : <Badge tone="ok" label="OK" />}</span><div className="small muted">{h.smtp.queued} queued · {h.smtp.sent24h} accepted (24h) · transport {h.smtp.transport}</div>{h.smtp.failed > 0 && <div className="small muted">Failed messages cannot be retried (their content is scrubbed after the final attempt); resend from the transfer or user instead. <button className="btn-link" onClick={() => void post('/api/admin/outbox/discard-failed').then(refresh)}>Discard failed</button></div>}</div>
-        <div className="stat"><span className="label">Audit chain</span><span className="value">{h.auditChain.ok ? <Badge tone="ok" label="Intact" /> : <Badge tone="err" label={`Broken at #${h.auditChain.brokenAt}`} />}</span><div className="small muted">{h.auditChain.checked} most recent records verified. A root or database administrator can still rewrite a single-host log; export regularly.</div></div>
-        <div className="stat"><span className="label">Backup verification</span><span className="value">{h.backup.lastVerifiedAt ? fmt(h.backup.lastVerifiedAt) : <Badge tone="warn" label="Never recorded" />}</span><div className="small muted">{h.backup.note || 'Record each restore test here.'}</div></div>
+        <div className="stat"><span className="label">Storage for files</span><span className="value">{pctFree.toFixed(1)}% free</span><div className="small muted">{formatBytes(h.disk.availableBytes)} free of {formatBytes(h.disk.totalBytes)} · {formatBytes(h.disk.usedByContent)} in transfers · {formatBytes(h.disk.reserved)} reserved for uploads</div></div>
+        <div className="stat"><span className="label">Malware scanner</span><span className="value">{h.scanner.ok ? <Badge tone="ok" label="Reachable" /> : <Badge tone="err" label="Unreachable" />}</span><div className="small muted">{h.scanner.version ?? h.scanner.error}</div><div className="small muted">Scans files up to {formatBytes(h.scanner.maxStreamBytes, 0)} · {h.scans.pending} waiting · {h.scans.failed} failed today</div></div>
+        <div className="stat"><span className="label">Background worker</span><span className="value">{workerAlive ? <Badge tone="ok" label="Heartbeat OK" /> : <Badge tone="err" label="No heartbeat" />}</span><div className="small muted">{h.workers.map((w) => `${w.id} last seen ${fmt(w.lastSeen)}`).join(' · ') || 'No worker has ever reported in'}</div><div className="small muted">{queued} job{queued === 1 ? '' : 's'} scheduled · {dead} gave up{dead > 0 && <> · <button className="btn-link" onClick={() => void post('/api/admin/jobs/discard-dead').then(refresh)}>discard dead jobs</button></>}</div></div>
+        <div className="stat"><span className="label">Deletion</span><span className="value">{h.deletion.failed > 0 ? <Badge tone="err" label={`${h.deletion.failed} failed`} /> : h.deletion.pending > 0 ? <Badge tone="warn" label={`${h.deletion.pending} pending`} /> : <Badge tone="ok" label="No backlog" />}</span><div className="small muted">Oldest overdue: {h.deletion.oldest ? fmt(h.deletion.oldest) : 'none'} · alert after {h.deletion.targetMinutes} min</div><div className="small muted">{h.deletion.completed24h} completed today · typically {h.deletion.avgSeconds !== null ? formatDuration(h.deletion.avgSeconds) : 'not yet measured'}</div></div>
+        <div className="stat"><span className="label">Right now</span><span className="value">{h.uploads.active} upload{h.uploads.active === 1 ? '' : 's'} · {h.activeStreams} download{h.activeStreams === 1 ? '' : 's'}</span><div className="small muted">{h.uploads.failed24h} upload{h.uploads.failed24h === 1 ? '' : 's'} abandoned today</div></div>
+        <div className="stat"><span className="label">Email</span><span className="value">{h.smtp.failed > 0 ? <Badge tone="err" label={`${h.smtp.failed} failed`} /> : <Badge tone="ok" label="OK" />}</span><div className="small muted">{h.smtp.sent24h} accepted today · {h.smtp.queued} waiting</div>{h.smtp.failed > 0 && <div className="small muted">Failed messages are not retried (their contents are scrubbed after the last attempt); resend from the transfer or the person instead. <button className="btn-link" onClick={() => void post('/api/admin/outbox/discard-failed').then(refresh)}>Discard failed</button></div>}</div>
+        <div className="stat"><span className="label">Audit log integrity</span><span className="value">{h.auditChain.ok ? <Badge tone="ok" label="Intact" /> : <Badge tone="err" label={`Broken at #${h.auditChain.brokenAt}`} />}</span><div className="small muted">Last {h.auditChain.checked} records verified. Someone with root on this server could still rewrite the log, so export it regularly.</div></div>
+        <div className="stat"><span className="label">Backup last proven</span><span className="value">{h.backup.lastVerifiedAt ? fmt(h.backup.lastVerifiedAt) : <Badge tone="warn" label="Never recorded" />}</span><div className="small muted">{h.backup.note || 'A backup only counts once a restore has been tested.'}</div></div>
       </div>
-      <section className="card" style={{ marginTop: 16 }} aria-labelledby="j-h">
-        <h2 id="j-h">Job queue</h2>
-        <table className="table"><thead><tr><th scope="col">Kind</th><th scope="col">State</th><th scope="col">Count</th><th scope="col">Oldest</th></tr></thead><tbody>{h.jobs.map((j) => <tr key={j.kind + j.state}><td className="mono small">{j.kind}</td><td>{j.state}</td><td className="num">{j.n}</td><td className="small">{j.oldest ? fmt(j.oldest) : '—'}</td></tr>)}{h.jobs.length === 0 && <tr><td colSpan={4} className="muted">Queue is empty.</td></tr>}</tbody></table>
-      </section>
-      <section className="card" aria-labelledby="b-h">
-        <h2 id="b-h">Record a backup/restore verification</h2>
+
+      <h2 className="section-h">Scheduled work</h2>
+      <div className="table-wrap">
+        <table className="table"><thead><tr><th scope="col">Job</th><th scope="col">State</th><th scope="col">Count</th><th scope="col">Next or oldest</th></tr></thead><tbody>{h.jobs.map((j) => <tr key={j.kind + j.state}><td>{JOB_LABELS[j.kind] ?? j.kind}<div className="mono small muted">{j.kind}</div></td><td>{j.state === 'dead' ? 'gave up' : j.state === 'queued' ? 'scheduled' : j.state}</td><td className="num">{j.n}</td><td className="small num">{j.oldest ? fmt(j.oldest) : '—'}</td></tr>)}{h.jobs.length === 0 && <tr><td colSpan={4} className="muted">Nothing scheduled.</td></tr>}</tbody></table>
+      </div>
+
+      <h2 className="section-h" id="b-h">Record a restore test</h2>
+      <div className="card" role="group" aria-labelledby="b-h">
+        <p className="small muted">After restoring a database backup somewhere and checking it works, note it here. The date appears above and in the audit log.</p>
         {msg && <div className="notice notice-info" role="status">{msg}</div>}
-        <div className="row"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Restored DB dump to staging; metadata only, content excluded by design" style={{ maxWidth: 520 }} aria-label="Verification note" /><button className="btn" onClick={() => void withStepUp(() => post('/api/admin/backup-verified', { note })).then(() => { setMsg('Recorded.'); refresh(); }).catch((e) => setMsg(errorMessage(e)))}>Record</button></div>
-      </section>
+        <div className="row"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Restored last night's dump to the test server; sign-in and history checked" style={{ maxWidth: 560 }} aria-label="What was tested" /><button className="btn" onClick={() => void withStepUp(() => post('/api/admin/backup-verified', { note })).then(() => { setMsg('Recorded.'); setNote(''); refresh(); }).catch((e) => setMsg(errorMessage(e)))}>Record</button></div>
+      </div>
+      <p className="small muted">For monitoring tools: <code>/healthz</code> says the service is running, <code>/readyz</code> says it can reach its database.</p>
     </>
   );
 }
+
+const JOB_LABELS: Record<string, string> = {
+  scan_file: 'Malware scan',
+  delete_transfer: 'Delete files at expiry',
+  expire_sweep: 'Expiry check',
+  reconcile: 'Storage reconciliation',
+  deliver_outbox: 'Send email',
+  sweep_abandoned_uploads: 'Clear abandoned uploads',
+  purge_audit: 'Retention clean-up',
+  notify_expiring: 'Expiry reminder',
+  disk_check: 'Disk and scanner check',
+};

@@ -85,14 +85,14 @@ export function TransferDetailPage() {
   return (
     <>
       <p className="small" style={{ marginBottom: 14 }}><Link to="/sent">← Sent</Link></p>
-      <div className="row-between" style={{ alignItems: 'flex-start', flexWrap: 'nowrap', gap: 20 }}>
+      <div className="detail-head">
         <div style={{ minWidth: 0 }}>
           <h1 className="lede">{headline(d)}</h1>
           <p className="lede-sub">
             <strong>{d.title || 'Untitled'}</strong> · {d.fileCount} file{d.fileCount === 1 ? '' : 's'}, {formatBytes(d.totalBytes)} · {d.sentAt ? `sent ${fmt(d.sentAt)}` : `started ${fmt(d.createdAt)}`}
           </p>
         </div>
-        <span className={`stamp stamp-${state.tone} lg`} style={{ flex: 'none', marginTop: 6 }}>{state.label}</span>
+        <span className={`stamp stamp-${state.tone} lg`}>{state.label}</span>
       </div>
       <p className="facts">
         <span>{isLive ? <>Available until <strong>{fmtLong(d.expiresAt)}</strong> ({countdown(d.expiresAt)})</> : <>Expiry was {fmtLong(d.expiresAt)}</>}</span>

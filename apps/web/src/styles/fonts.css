@@ -8,11 +8,11 @@
   src: url('../../node_modules/@fontsource-variable/fraunces/files/fraunces-latin-opsz-normal.woff2') format('woff2-variations');
 }
 @font-face {
-  font-family: 'Atkinson Hyperlegible Next';
+  font-family: 'Public Sans';
   font-style: normal;
   font-display: swap;
-  font-weight: 200 800;
-  src: url('../../node_modules/@fontsource-variable/atkinson-hyperlegible-next/files/atkinson-hyperlegible-next-latin-wght-normal.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  src: url('../../node_modules/@fontsource-variable/public-sans/files/public-sans-latin-wght-normal.woff2') format('woff2-variations');
 }
 @font-face {
   font-family: 'Atkinson Hyperlegible Mono';

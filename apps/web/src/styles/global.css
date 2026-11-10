@@ -152,6 +152,19 @@ hr,
 .grow {
   flex: 1;
 }
+.detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px 20px;
+}
+.detail-head .lede {
+  overflow-wrap: anywhere;
+}
+.detail-head .stamp {
+  flex: none;
+  margin-top: 6px;
+}
 
 /* ================================================================== buttons & inputs */
 .btn {
@@ -343,6 +356,9 @@ legend {
   border: 1px solid var(--line-input);
   border-radius: var(--radius);
   overflow: hidden;
+}
+.field > .seg {
+  align-self: flex-start;
 }
 .seg label {
   position: relative;
@@ -851,6 +867,7 @@ legend {
 
 /* ================================================================== tables & lists */
 .table-wrap {
+  position: relative; /* keeps visually-hidden header text inside the scroll area */
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -859,6 +876,9 @@ legend {
 .table {
   width: 100%;
   border-collapse: collapse;
+}
+.table .btn {
+  white-space: nowrap;
 }
 .table th,
 .table td {
@@ -1811,6 +1831,8 @@ details.history[open] > summary::before {
   white-space: nowrap;
 }
 .log-row .outcome {
+  min-width: 4.2em;
+  text-align: right;
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--ink-3);
@@ -2114,11 +2136,32 @@ details.history[open] > summary::before {
   .log-row > summary {
     grid-template-columns: minmax(0, 1fr) auto;
   }
+  .detail-head {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+  }
+  .detail-head .stamp {
+    margin: 0 0 4px;
+  }
+  .log-row > summary {
+    gap: 1px 12px;
+    padding: 9px 14px;
+  }
   .log-row time {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .log-row .outcome {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .log-row .what {
     grid-column: 1 / -1;
+    grid-row: 2;
   }
   .log-row .actor {
     grid-column: 1 / -1;
+    grid-row: 3;
   }
   .sent-row {
     grid-template-columns: minmax(0, 1fr);
@@ -2129,6 +2172,7 @@ details.history[open] > summary::before {
   }
   .sent-row .side strong {
     display: inline;
+    margin-right: 0.5em;
   }
   .person {
     grid-template-columns: minmax(0, 1fr) 36px;

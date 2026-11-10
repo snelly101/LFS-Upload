@@ -18,6 +18,14 @@ interface SessionItem {
   mfaMethod: string | null;
 }
 
+/** "Chrome on Windows" rather than a raw user-agent string. */
+function device(ua: string | null): string {
+  if (!ua) return 'Unknown device';
+  const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+  const os = /Windows/.test(ua) ? 'Windows' : /iPhone|iPad|iPod/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS X|Macintosh/.test(ua) ? 'macOS' : /CrOS/.test(ua) ? 'ChromeOS' : /Linux/.test(ua) ? 'Linux' : '';
+  return os ? `${browser} on ${os}` : browser;
+}
+
 export function SecurityPage() {
   const { me, refresh, withStepUp } = useAuth();
   const qc = useQueryClient();
@@ -132,7 +140,7 @@ export function SecurityPage() {
                 <time dateTime={s.lastSeenAt}>{fmt(s.lastSeenAt)}</time>
                 <div>
                   {s.current ? <strong>This session</strong> : 'Session'} · {s.authMethod}{s.mfaMethod ? ` + ${s.mfaMethod}` : ''}
-                  <div className="who">{s.ipPrefix ?? 'unknown network'} · {(s.userAgent ?? '').slice(0, 60)}</div>
+                  <div className="who">{device(s.userAgent)} · {s.ipPrefix ?? 'unknown network'}</div>
                 </div>
               </li>
             ))}

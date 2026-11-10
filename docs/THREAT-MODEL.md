@@ -48,3 +48,18 @@
 * **Scanner coverage**: files larger than `StreamMaxLength` (4000 MB default) are not scanned. Large media
   or disk images are common and will show as "oversized"; the policy switch to release them unscanned is
   off by default and each release is audited.
+
+
+## File requests (inbound uploads)
+
+Sending files *in* adds an upload surface used by people outside the organisation. It is constrained
+as follows (details and tests in FILE-REQUESTS.md):
+
+| Threat | Control |
+|---|---|
+| Anonymous or forwarded-link upload | Contributors are named; mailbox verification is mandatory and cannot be disabled for a request; uploads require the recipient session bound to that invitation token. |
+| A contributor reading other people's files | Contributors can never download; their view lists only their own uploads; the recipient download and ZIP routes return 404 for inbound transfers. |
+| Malicious upload reaching staff | Quarantine and scan before any download; only clean files are downloadable by the requester; blocked files are flagged. Endpoint protection on staff devices remains necessary. |
+| Staff or administrators browsing received content | Only the requesting member of staff can download; there is no administrator route; every owner download is audited. |
+| Storage exhaustion by an outsider | Same per-file, per-transfer, quota and disk-headroom limits as staff uploads, charged to the requester; rate limits on registration and upload. |
+| Upload-session hijack across endpoints | Staff and contributor upload endpoints each refuse the other's upload ids; ids are random and checked against the session's grant. |

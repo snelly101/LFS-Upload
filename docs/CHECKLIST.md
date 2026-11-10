@@ -119,6 +119,14 @@ Threat model and ASVS mapping: **Done** (`docs/THREAT-MODEL.md`, `docs/ASVS-MAP.
 ## 12 Tests
 See `TEST-EVIDENCE.md` for commands and output. Mapping: 1→01, 2→02, 3→03, 4→04, 5→05, 6→06, 7→07, 8→08, 9→09, 10→10, 11→11/11b, 12→12, 13→13 (opt-in `LARGE_TESTS=1`), 14→14, 15→15, 16→16, 17→17, 18→`tests/e2e`.
 
+## Additions after first handover
+| Addition | Status | Where |
+|---|---|---|
+| File requests (inbound, named and verified) | Done, 6 tests | `docs/FILE-REQUESTS.md`, test 20 |
+| Upload size capped at what the scanner can check, stated before upload | Done | `effectiveMaxFileBytes()`, test 19 |
+| List pages in one query, live updates over SSE, contacts, reminders | Done | `services/transfers.ts`, `services/events.ts`, test 19 |
+| Monitoring status endpoint, scheduled encrypted backups with restore check, host hardening, CI and image publishing | Done (scripts lint-clean; not yet run on the production host) | `deploy/`, `.github/`, `docs/GO-LIVE.md` |
+
 ## Known gaps and limitations
 * SSO was validated against crafted claim sets and discovery logic, not a live Entra tenant.
 * SMTP was validated with in-memory/file sinks; the production relay must be tested with the built-in test send.

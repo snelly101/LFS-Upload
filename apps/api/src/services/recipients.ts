@@ -55,6 +55,8 @@ export function publicState(ctx: AppContext, l: GrantLookup): RecipientPublicVie
   if (grant.status === 'revoked' || transfer.status === 'revoked') return 'revoked';
   if (transfer.status === 'expired' || new Date(transfer.expires_at) <= now) return 'expired';
   if (!isAccessible(transfer, now) || grant.status !== 'invited') return 'unavailable';
+  // File requests never run as bearer links: that would be an anonymous upload endpoint.
+  if (transfer.direction === 'inbound') return 'needs_verification';
   return transfer.verification_mode === 'bearer' ? 'bearer_ready' : 'needs_verification';
 }
 
@@ -160,7 +162,7 @@ export async function verifyCode(ctx: AppContext, q: Queryable, l: NonNullable<G
   await q.query(`UPDATE recipient_grants SET first_verified_at = COALESCE(first_verified_at, $2), last_verified_at = $2 WHERE id = $1`, [grant.id, now]);
   const s = await createRecipientSession(ctx, q, l, 'required', a);
   await audit(q, { ...recipientActor(a, grant), actorSessionId: s.session.id, eventType: 'recipient.verified', details: { first } });
-  if (first) await notifySender(ctx, q, transfer, grant, 'firstVerifiedView', `${grant.email} verified their email and opened "${transfer.title || 'Untitled transfer'}"`, `firstview:${grant.id}`);
+  if (first && transfer.direction === 'outbound') await notifySender(ctx, q, transfer, grant, 'firstVerifiedView', `${grant.email} verified their email and opened "${transfer.title || 'Untitled transfer'}"`, `firstview:${grant.id}`);
   return { ok: true, ...s };
 }
 
@@ -198,7 +200,7 @@ export async function loadRecipientSession(ctx: AppContext, q: Queryable, l: Non
   if (s.revoked_at || new Date(s.expires_at) <= now) return null;
   if (!isAccessible(l.transfer, now) || l.grant.status !== 'invited') return null;
   // Policy tightening: a bearer session is invalid once the transfer requires verification.
-  if (l.transfer.verification_mode === 'required' && s.mode !== 'required') return null;
+  if ((l.transfer.verification_mode === 'required' || l.transfer.direction === 'inbound') && s.mode !== 'required') return null;
   return s;
 }
 

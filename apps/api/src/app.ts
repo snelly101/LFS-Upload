@@ -20,6 +20,7 @@ import { auditRoutes } from './routes/audit.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { healthRoutes } from './routes/health.js';
 import { eventRoutes } from './routes/events.js';
+import { requestRoutes } from './routes/requests.js';
 import { startAccessWatcher } from './services/accessWatcher.js';
 
 export interface BuildOptions {
@@ -91,7 +92,7 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
       throw new HttpError(403, 'Cross-origin request rejected', 'csrf');
     }
     const xr = req.headers['x-requested-with'];
-    const isTus = req.url.startsWith('/api/uploads/tus');
+    const isTus = req.url.startsWith('/api/uploads/tus') || /^\/api\/r\/[A-Za-z0-9_-]+\/tus(\/|$|\?)/.test(req.url);
     if (!xr && !(isTus && req.headers['tus-resumable'])) throw new HttpError(403, 'Missing X-Requested-With header', 'csrf');
   });
 
@@ -123,6 +124,7 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
   await notificationRoutes(app, ctx);
   await healthRoutes(app, ctx);
   await eventRoutes(app, ctx);
+  await requestRoutes(app, ctx);
 
   // Serve the built SPA (production). Recipient pages live under /r/... and are served the same bundle.
   if (opts.serveWeb && fs.existsSync(opts.serveWeb)) {

@@ -26,6 +26,8 @@ export interface TransferFileView {
   contentType: string;
   uploadStatus: UploadStatus;
   uploadedBytes: number;
+  /** Inbound only: the contributor who sent this file. */
+  uploadedByEmail?: string | null;
   scanStatus: ScanStatus;
   scanDetail: string | null;
   storageState: string;
@@ -44,11 +46,17 @@ export interface GrantView {
   firstVerifiedAt: string | null;
   allFilesCompletedAt: string | null;
   filesCompleted: number;
+  /** Inbound only: files this contributor has sent that passed the scan. */
+  filesUploaded?: number;
   invitationStatus: 'queued' | 'accepted_by_provider' | 'failed' | 'suppressed' | 'none';
 }
 
+export type TransferDirection = 'outbound' | 'inbound';
+
 export interface TransferSummary {
   id: string;
+  /** 'inbound' = a file request: named external people send files to the owner. */
+  direction: TransferDirection;
   title: string;
   status: TransferStatus;
   deletionStatus: DeletionStatus;
@@ -74,6 +82,8 @@ export interface TransferDetail extends TransferSummary {
   files: TransferFileView[];
   grants: GrantView[];
   revokedAt: string | null;
+  /** Inbound only: when the request stopped accepting uploads. */
+  closedAt?: string | null;
   deletion: {
     requestedAt: string | null;
     startedAt: string | null;
@@ -105,6 +115,22 @@ export interface RecipientPublicView {
   supportEmail: string | null;
   recipientHint: string | null;
   verification: { codeTtlSeconds: number; resendCooldownSeconds: number } | null;
+  /** What the link is for; carries no transfer metadata. */
+  purpose?: 'download' | 'upload';
+}
+
+/** What a verified contributor sees for a file request. Only their own uploads are listed. */
+export interface RecipientInboundView {
+  direction: 'inbound';
+  title: string;
+  message: string;
+  requesterName: string;
+  requesterEmail: string;
+  recipientEmail: string;
+  expiresAt: string;
+  sessionExpiresAt: string;
+  limits: { maxFileBytes: number; scanLimited: boolean; remainingFiles: number; remainingBytes: number; blockedExtensions: string[] };
+  uploads: { id: string; name: string; sizeBytes: number; uploadedBytes: number; state: 'uploading' | 'checking' | 'received' | 'blocked' | 'failed' }[];
 }
 
 export interface RecipientAuthorisedView {

@@ -37,13 +37,14 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
   async function ownedFile(raw: RawWithAuth, uploadId: string): Promise<FileRow> {
     const auth = raw.securesendAuth;
     if (!auth) throw new TusError(401, 'Authentication required');
-    const r = await ctx.db.query<FileRow & { sender_id: string; tstatus: string }>(
-      `SELECT f.*, t.sender_id, t.status::text AS tstatus FROM transfer_files f JOIN transfers t ON t.id = f.transfer_id WHERE f.upload_id = $1`,
+    const r = await ctx.db.query<FileRow & { sender_id: string; tstatus: string; direction: string }>(
+      `SELECT f.*, t.sender_id, t.status::text AS tstatus, t.direction::text AS direction FROM transfer_files f JOIN transfers t ON t.id = f.transfer_id WHERE f.upload_id = $1`,
       [uploadId],
     );
     const f = r.rows[0];
-    // Generic 404 for both "does not exist" and "not yours" so ids cannot be enumerated.
-    if (!f || f.sender_id !== auth.user.id) throw new TusError(404, 'Upload not found');
+    // Generic 404 for both "does not exist" and "not yours" so ids cannot be enumerated. Files being
+    // sent in to a file request belong to the contributor's endpoint, never this one.
+    if (!f || f.sender_id !== auth.user.id || f.direction !== 'outbound') throw new TusError(404, 'Upload not found');
     if (f.upload_status === 'finalised' || f.upload_status === 'abandoned') throw new TusError(409, 'Upload is closed');
     if (!['draft', 'uploading', 'scanning', 'ready'].includes(f.tstatus)) throw new TusError(409, 'Transfer is immutable');
     return f;

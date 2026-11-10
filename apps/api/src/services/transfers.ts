@@ -38,6 +38,8 @@ export interface TransferRow {
   metadata_purged_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  direction: 'outbound' | 'inbound';
+  closed_at: Date | null;
 }
 
 export interface FileRow {
@@ -54,6 +56,7 @@ export interface FileRow {
   storage_state: 'none' | 'incoming' | 'quarantine' | 'released' | 'deleted';
   uploaded_bytes: number;
   created_at: Date;
+  uploaded_by_grant_id?: string | null;
 }
 
 export type ActorInfo = Omit<AuditInput, 'eventType'> & { actorUserId: string; actorEmail: string };
@@ -177,7 +180,21 @@ export const AddFileSchema = z.object({
  */
 export async function addFile(ctx: AppContext, q: Queryable, user: { id: string; email: string; quota_bytes: number | null }, transferId: string, input: z.infer<typeof AddFileSchema>, a: ActorInfo): Promise<FileRow> {
   const t = await loadOwnedTransfer(q, transferId, user.id, true);
-  if (!MUTABLE.has(t.status)) throw conflict('Transfer has been sent and is immutable', 'immutable');
+  if (t.direction !== 'outbound' || !MUTABLE.has(t.status)) throw conflict('Transfer has been sent and is immutable', 'immutable');
+  const f = await registerFileRow(ctx, q, t, { id: user.id, quota_bytes: user.quota_bytes }, null, input);
+  await q.query(`UPDATE transfers SET status = CASE WHEN status = 'draft' THEN 'uploading'::transfer_status ELSE status END WHERE id = $1`, [t.id]);
+  await audit(q, { ...a, eventType: 'file.registered', transferId: t.id, fileId: f.id, details: { displayName: f.display_name, sizeBytes: input.sizeBytes } });
+  await recomputeTransferStatus(q, t.id);
+  return f;
+}
+
+/**
+ * Validate a new file against every limit (size the scanner can check, type, count, transfer total,
+ * owner and organisation quota, disk headroom), then create its row and reserve the bytes against
+ * the owning member of staff. Shared by staff uploads and contributor uploads to a file request.
+ * The caller must already hold the transfer row lock.
+ */
+export async function registerFileRow(ctx: AppContext, q: Queryable, t: TransferRow, owner: { id: string; quota_bytes: number | null }, uploadedByGrantId: string | null, input: z.infer<typeof AddFileSchema>): Promise<FileRow> {
   const s = await ctx.settings.all();
   const tp = s.transferPolicy;
   const maxFile = effectiveMaxFileBytes(tp, ctx.config.CLAMD_MAX_STREAM_BYTES);
@@ -193,26 +210,24 @@ export async function addFile(ctx: AppContext, q: Queryable, user: { id: string;
   const ext = safeName.includes('.') ? safeName.split('.').pop()!.toLowerCase() : '';
   if (tp.blockedExtensions.includes(ext)) throw badRequest(`Files of type .${ext} are not permitted`, 'blocked_type');
   if (tp.allowedExtensions.length && !tp.allowedExtensions.includes(ext)) throw badRequest(`Files of type .${ext || '(none)'} are not permitted`, 'blocked_type');
-  // quota: user + organisation, including reservations for in-flight uploads
-  const quota = user.quota_bytes ?? tp.defaultUserQuotaBytes;
-  const usage = await quotaUsage(q, user.id);
-  if (quota > 0 && usage.usedBytes + usage.reservedBytes + input.sizeBytes > quota) throw badRequest('Your storage quota would be exceeded', 'quota_exceeded', { quotaBytes: quota, usedBytes: usage.usedBytes + usage.reservedBytes });
+  // quota: owner + organisation, including reservations for in-flight uploads
+  const quota = owner.quota_bytes ?? tp.defaultUserQuotaBytes;
+  const usage = await quotaUsage(q, owner.id);
+  if (quota > 0 && usage.usedBytes + usage.reservedBytes + input.sizeBytes > quota) throw badRequest(uploadedByGrantId ? 'There is not enough space left for this file' : 'Your storage quota would be exceeded', 'quota_exceeded', uploadedByGrantId ? {} : { quotaBytes: quota, usedBytes: usage.usedBytes + usage.reservedBytes });
   const org = await orgUsage(q);
-  if (tp.organisationQuotaBytes > 0 && org.usedBytes + org.reservedBytes + input.sizeBytes > tp.organisationQuotaBytes) throw badRequest('The organisation storage quota would be exceeded', 'org_quota_exceeded');
+  if (tp.organisationQuotaBytes > 0 && org.usedBytes + org.reservedBytes + input.sizeBytes > tp.organisationQuotaBytes) throw badRequest(uploadedByGrantId ? 'There is not enough space left for this file' : 'The organisation storage quota would be exceeded', 'org_quota_exceeded');
   const disk = await ctx.storage.diskUsage();
   const headroom = Math.floor(disk.totalBytes * (s.storage.lowDiskCriticalPercent / 100));
-  if (disk.availableBytes - org.reservedBytes - input.sizeBytes < headroom) throw badRequest('Not enough free storage on the server for this file', 'disk_full');
+  if (disk.availableBytes - org.reservedBytes - input.sizeBytes < headroom) throw badRequest(uploadedByGrantId ? 'There is not enough space left for this file' : 'Not enough free storage on the server for this file', 'disk_full');
   const uploadId = randomToken(24).replace(/[^A-Za-z0-9_-]/g, '');
   const r = await q.query<FileRow>(
-    `INSERT INTO transfer_files(transfer_id, upload_id, display_name, original_name, size_bytes, content_type, upload_status, storage_state)
-     VALUES ($1,$2,$3,$4,$5,$6,'pending','none') RETURNING *`,
-    [t.id, uploadId, safeName, input.name.slice(0, 1000), input.sizeBytes, input.contentType.slice(0, 200)],
+    `INSERT INTO transfer_files(transfer_id, upload_id, display_name, original_name, size_bytes, content_type, upload_status, storage_state, uploaded_by_grant_id)
+     VALUES ($1,$2,$3,$4,$5,$6,'pending','none',$7) RETURNING *`,
+    [t.id, uploadId, safeName, input.name.slice(0, 1000), input.sizeBytes, input.contentType.slice(0, 200), uploadedByGrantId],
   );
   const f = r.rows[0]!;
-  await q.query(`INSERT INTO storage_reservations(file_id, user_id, bytes) VALUES ($1,$2,$3)`, [f.id, user.id, input.sizeBytes]);
-  await q.query(`UPDATE transfers SET status = CASE WHEN status = 'draft' THEN 'uploading'::transfer_status ELSE status END, file_count = file_count + 1, total_bytes = total_bytes + $2 WHERE id = $1`, [t.id, input.sizeBytes]);
-  await audit(q, { ...a, eventType: 'file.registered', transferId: t.id, fileId: f.id, details: { displayName: safeName, sizeBytes: input.sizeBytes } });
-  await recomputeTransferStatus(q, t.id);
+  await q.query(`INSERT INTO storage_reservations(file_id, user_id, bytes) VALUES ($1,$2,$3)`, [f.id, owner.id, input.sizeBytes]);
+  await q.query(`UPDATE transfers SET file_count = file_count + 1, total_bytes = total_bytes + $2 WHERE id = $1`, [t.id, input.sizeBytes]);
   return f;
 }
 
@@ -265,7 +280,7 @@ function normaliseEmails(list: string[]): string[] {
   return [...new Set(list.map((e) => e.trim().toLowerCase()))];
 }
 
-async function checkRecipientPolicy(ctx: AppContext, emails: string[], existingCount: number) {
+export async function checkRecipientPolicy(ctx: AppContext, emails: string[], existingCount: number) {
   const s = await ctx.settings.all();
   const tp = s.transferPolicy;
   if (existingCount + emails.length > tp.maxRecipientsPerTransfer) throw badRequest('Too many recipients', 'too_many_recipients', { max: tp.maxRecipientsPerTransfer });
@@ -294,7 +309,7 @@ export async function setRecipients(ctx: AppContext, q: Queryable, userId: strin
 }
 
 /** Issue a fresh token for a grant (at send, resend, or add-after-send). Returns the raw token. */
-async function issueGrantToken(q: Queryable, grantId: string): Promise<string> {
+export async function issueGrantToken(q: Queryable, grantId: string): Promise<string> {
   const token = randomToken(32);
   await q.query(`UPDATE recipient_grants SET token_hash = $2 WHERE id = $1`, [grantId, sha256(token)]);
   return token;
@@ -304,7 +319,18 @@ export function recipientLink(ctx: AppContext, token: string): string {
   return new URL(`/r/${token}`, ctx.config.publicUrl).toString();
 }
 
-async function queueInvitation(ctx: AppContext, q: Queryable, t: TransferRow, grant: { id: string; email: string }, token: string, sender: { display_name: string; email: string }, attempt: number) {
+export async function queueInvitation(ctx: AppContext, q: Queryable, t: TransferRow, grant: { id: string; email: string }, token: string, sender: { display_name: string; email: string }, attempt: number) {
+  if (t.direction === 'inbound') {
+    await queueEmail(q, {
+      kind: 'file_request',
+      to: grant.email,
+      transferId: t.id,
+      grantId: grant.id,
+      data: { requesterName: sender.display_name || sender.email, requesterEmail: sender.email, link: recipientLink(ctx, token), expiresAt: new Date(t.expires_at).toISOString() },
+      dedupeKey: `invite:${grant.id}:${attempt}`,
+    });
+    return;
+  }
   await queueEmail(q, {
     kind: 'transfer_available',
     to: grant.email,
@@ -361,6 +387,7 @@ export async function scheduleLifecycleJobs(ctx: AppContext, q: Queryable, t: Tr
 export async function addRecipientAfterSend(ctx: AppContext, q: Queryable, user: { id: string; email: string; display_name: string }, transferId: string, email: string, reason: string, a: ActorInfo) {
   const t = await loadOwnedTransfer(q, transferId, user.id, true);
   if (!isAccessible(t, ctx.clock.now())) throw conflict('Transfer is not active', 'not_active');
+  if (t.direction === 'inbound' && t.closed_at) throw conflict('This request is closed', 'not_active');
   const norm = email.trim().toLowerCase();
   const count = (await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM recipient_grants WHERE transfer_id = $1`, [t.id])).rows[0]!.n;
   await checkRecipientPolicy(ctx, [norm], count);
@@ -380,7 +407,7 @@ export async function resendInvitation(ctx: AppContext, q: Queryable, user: { id
   const g = (await q.query<{ id: string; email: string; status: string }>(`SELECT id, email, status FROM recipient_grants WHERE id = $1 AND transfer_id = $2 FOR UPDATE`, [grantId, t.id])).rows[0];
   if (!g) throw notFound('Recipient not found');
   if (g.status !== 'invited') throw conflict('Recipient grant is not active', 'grant_inactive');
-  const n = (await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM outbox_messages WHERE grant_id = $1 AND kind = 'transfer_available'`, [g.id])).rows[0]!.n;
+  const n = (await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM outbox_messages WHERE grant_id = $1 AND kind IN ('transfer_available','file_request') AND dedupe_key LIKE 'invite:%'`, [g.id])).rows[0]!.n;
   if (n >= 5) throw conflict('Invitation has already been resent the maximum number of times', 'resend_limit');
   // Rotating the token invalidates the previously emailed link; the old link holder can no longer use it.
   await q.query(`UPDATE recipient_sessions SET revoked_at = now() WHERE grant_id = $1 AND revoked_at IS NULL`, [g.id]);
@@ -450,11 +477,11 @@ export async function markExpired(ctx: AppContext, q: Queryable, transferId: str
   if (!(t.status === 'active' || t.status === 'sending') || new Date(t.expires_at) > now) return false;
   await q.query(`UPDATE transfers SET status = 'expired', expired_at = $2 WHERE id = $1`, [t.id, now]);
   await q.query(`UPDATE recipient_sessions SET revoked_at = $2 WHERE transfer_id = $1 AND revoked_at IS NULL`, [t.id, now]);
-  await q.query(`UPDATE outbox_messages SET status = 'suppressed' WHERE transfer_id = $1 AND status IN ('queued','failed') AND kind IN ('transfer_available','expiring_soon_recipient')`, [t.id]);
+  await q.query(`UPDATE outbox_messages SET status = 'suppressed' WHERE transfer_id = $1 AND status IN ('queued','failed') AND kind IN ('transfer_available','expiring_soon_recipient','file_request')`, [t.id]);
   await audit(q, { actorKind: 'system', eventType: 'transfer.expired', transferId: t.id, details: { expiresAt: new Date(t.expires_at).toISOString() } });
   // Expired-without-download notice
   const anyDownload = await q.query(`SELECT 1 FROM download_attempts d JOIN recipient_grants g ON g.id = d.grant_id WHERE g.transfer_id = $1 AND d.completed_at IS NOT NULL LIMIT 1`, [t.id]);
-  if (!anyDownload.rowCount && t.notify_prefs.expiredWithoutDownload) {
+  if (t.direction === 'outbound' && !anyDownload.rowCount && t.notify_prefs.expiredWithoutDownload) {
     const sender = (await q.query<{ id: string; email: string }>(`SELECT id, email FROM users WHERE id = $1`, [t.sender_id])).rows[0]!;
     await inApp(q, { userId: sender.id, kind: 'expired_without_download', title: `"${t.title || 'Untitled transfer'}" expired without any completed download`, transferId: t.id, dedupeKey: `expnodl:${t.id}` });
     await queueEmail(q, { kind: 'sender_activity', to: sender.email, toUserId: sender.id, transferId: t.id, data: { kind: 'expired_without_download', transferTitle: t.title || 'Untitled transfer', recipientEmail: null, link: new URL(`/transfers/${t.id}`, ctx.config.publicUrl).toString(), detail: 'Transfer expired without any completed download' }, dedupeKey: `expnodl:${t.id}` });
@@ -482,14 +509,15 @@ export function fileView(f: FileRow): TransferFileView {
 const iso = (d: Date | string | null) => (d ? new Date(d).toISOString() : null);
 
 export async function transferDetail(ctx: AppContext, q: Queryable, t: TransferRow): Promise<TransferDetail> {
-  const files = (await q.query<FileRow>(`SELECT * FROM transfer_files WHERE transfer_id = $1 AND upload_status <> 'abandoned' ORDER BY created_at`, [t.id])).rows;
+  const files = (await q.query<FileRow & { uploaded_by_email: string | null }>(`SELECT f.*, ug.email::text AS uploaded_by_email FROM transfer_files f LEFT JOIN recipient_grants ug ON ug.id = f.uploaded_by_grant_id WHERE f.transfer_id = $1 AND f.upload_status <> 'abandoned' ORDER BY f.created_at`, [t.id])).rows;
   const grants = (
     await q.query<{
       id: string; email: string; status: GrantView['status']; invited_at: Date | null; revoked_at: Date | null; added_after_send: boolean; downloads_used: number;
-      first_link_seen_at: Date | null; first_verified_at: Date | null; all_files_completed_at: Date | null; files_completed: number; inv_status: string | null;
+      first_link_seen_at: Date | null; first_verified_at: Date | null; all_files_completed_at: Date | null; files_completed: number; files_uploaded: number; inv_status: string | null;
     }>(
       `SELECT g.*, (SELECT count(*)::int FROM recipient_file_completion c WHERE c.grant_id = g.id) AS files_completed,
-              (SELECT o.status::text FROM outbox_messages o WHERE o.grant_id = g.id AND o.kind = 'transfer_available' ORDER BY o.id DESC LIMIT 1) AS inv_status
+              (SELECT count(*)::int FROM transfer_files uf WHERE uf.uploaded_by_grant_id = g.id AND uf.storage_state = 'released') AS files_uploaded,
+              (SELECT o.status::text FROM outbox_messages o WHERE o.grant_id = g.id AND o.kind IN ('transfer_available','file_request') ORDER BY o.id DESC LIMIT 1) AS inv_status
          FROM recipient_grants g WHERE g.transfer_id = $1 ORDER BY g.created_at`,
       [t.id],
     )
@@ -504,7 +532,8 @@ export async function transferDetail(ctx: AppContext, q: Queryable, t: TransferR
     downloadLimitPerRecipient: t.download_limit_per_recipient,
     notifyPrefs: t.notify_prefs,
     effectivePolicy: t.effective_policy as unknown as Record<string, unknown>,
-    files: files.map(fileView),
+    files: files.map((f) => ({ ...fileView(f), uploadedByEmail: f.uploaded_by_email })),
+    closedAt: iso(t.closed_at),
     grants: grants.map((g) => ({
       id: g.id,
       email: g.email,
@@ -517,6 +546,7 @@ export async function transferDetail(ctx: AppContext, q: Queryable, t: TransferR
       firstVerifiedAt: iso(g.first_verified_at),
       allFilesCompletedAt: iso(g.all_files_completed_at),
       filesCompleted: g.files_completed,
+      filesUploaded: g.files_uploaded,
       invitationStatus: g.inv_status === 'sent' ? 'accepted_by_provider' : g.inv_status === 'queued' || g.inv_status === 'sending' ? 'queued' : g.inv_status === 'failed' ? 'failed' : g.inv_status === 'suppressed' ? 'suppressed' : 'none',
     })),
     revokedAt: iso(t.revoked_at),
@@ -532,6 +562,7 @@ async function summaryFor(q: Queryable, t: TransferRow): Promise<TransferSummary
   const last = (await q.query<{ occurred_at: Date; event_type: string }>(`SELECT occurred_at, event_type FROM audit_events WHERE transfer_id = $1 ORDER BY id DESC LIMIT 1`, [t.id])).rows[0];
   return {
     id: t.id,
+    direction: t.direction,
     title: t.title,
     status: t.status,
     deletionStatus: t.deletion_status,
@@ -619,6 +650,7 @@ export async function listTransfers(q: Queryable, scope: { senderId?: string }, 
   ).rows;
   const items: TransferSummary[] = rows.map((t) => ({
     id: t.id,
+    direction: t.direction,
     title: t.title,
     status: t.status,
     deletionStatus: t.deletion_status,
@@ -665,7 +697,7 @@ export async function remindRecipient(ctx: AppContext, q: Queryable, user: { id:
   const g = (await q.query<{ id: string; email: string; status: string; all_files_completed_at: Date | null }>(`SELECT id, email, status, all_files_completed_at FROM recipient_grants WHERE id = $1 AND transfer_id = $2 FOR UPDATE`, [grantId, t.id])).rows[0];
   if (!g) throw notFound('Recipient not found');
   if (g.status !== 'invited') throw conflict('This recipient no longer has access', 'grant_inactive');
-  if (g.all_files_completed_at) throw conflict('This recipient has already downloaded everything', 'already_completed');
+  if (t.direction === 'outbound' && g.all_files_completed_at) throw conflict('This recipient has already downloaded everything', 'already_completed');
   const prior = (await q.query<{ n: number; last: Date | null }>(`SELECT count(*)::int AS n, max(created_at) AS last FROM outbox_messages WHERE grant_id = $1 AND dedupe_key LIKE 'manual-remind:%'`, [g.id])).rows[0]!;
   if (prior.n >= MAX_REMINDERS_PER_GRANT) throw conflict(`You have already sent ${MAX_REMINDERS_PER_GRANT} reminders to this recipient`, 'remind_limit');
   if (prior.last && now.getTime() - new Date(prior.last).getTime() < REMINDER_COOLDOWN_MS) {
@@ -674,11 +706,14 @@ export async function remindRecipient(ctx: AppContext, q: Queryable, user: { id:
   }
   const token = await issueGrantToken(q, g.id);
   await queueEmail(q, {
-    kind: 'expiring_soon_recipient',
+    kind: t.direction === 'inbound' ? 'file_request' : 'expiring_soon_recipient',
     to: g.email,
     transferId: t.id,
     grantId: g.id,
-    data: { senderName: user.display_name || user.email, link: recipientLink(ctx, token), expiresAt: new Date(t.expires_at).toISOString() },
+    data:
+      t.direction === 'inbound'
+        ? { requesterName: user.display_name || user.email, requesterEmail: user.email, link: recipientLink(ctx, token), expiresAt: new Date(t.expires_at).toISOString(), reminder: true }
+        : { senderName: user.display_name || user.email, link: recipientLink(ctx, token), expiresAt: new Date(t.expires_at).toISOString() },
     dedupeKey: `manual-remind:${g.id}:${prior.n + 1}`,
   });
   // created_at defaults to the database clock; align it with the injected clock so cooldowns are testable.

@@ -2,9 +2,10 @@ import type { Queryable } from '../db.js';
 import type { AppContext } from '../context.js';
 import { enqueue } from '../lib/jobs.js';
 import type { TemplateKey } from '../lib/templates.js';
+import type { RequestTemplateKey } from '../lib/templates-requests.js';
 
 export interface OutboxInput {
-  kind: TemplateKey;
+  kind: TemplateKey | RequestTemplateKey;
   to: string;
   toUserId?: string | null;
   transferId?: string | null;

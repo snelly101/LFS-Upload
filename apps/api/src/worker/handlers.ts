@@ -4,6 +4,7 @@ import type { AppContext } from '../context.js';
 import { audit } from '../lib/audit.js';
 import { enqueue, type ClaimedJob } from '../lib/jobs.js';
 import { templates, type TemplateContext, type TemplateKey } from '../lib/templates.js';
+import { requestTemplates, type RequestTemplateKey } from '../lib/templates-requests.js';
 import { deleteTransferContent } from '../services/deletion.js';
 import { markExpired, recomputeTransferStatus, requestDeletion, type TransferRow } from '../services/transfers.js';
 import { inApp, queueEmail, raiseAlert, resolveAlert } from '../services/notifications.js';
@@ -39,6 +40,16 @@ export async function scanFile(ctx: AppContext, job: ClaimedJob) {
       await ctx.storage.move(p, ctx.storage.pathFor('released', f.id));
       await c.query(`UPDATE transfer_files SET storage_state = 'released' WHERE id = $1`, [f.id]);
       await audit(c, { actorKind: 'system', eventType: outcome.status === 'clean' ? 'scan.passed' : 'scan.released_unscanned', transferId: f.transfer_id, fileId: f.id, outcome: outcome.status === 'clean' ? 'success' : 'info', details: { engine, detail } });
+      if (t.direction === 'inbound') {
+        // Tell the requester a file has arrived. In-app for every file; one email per contributor.
+        const up = (await c.query<{ grant_id: string | null; email: string | null }>(`SELECT f.uploaded_by_grant_id AS grant_id, g.email::text AS email FROM transfer_files f LEFT JOIN recipient_grants g ON g.id = f.uploaded_by_grant_id WHERE f.id = $1`, [f.id])).rows[0];
+        const who = up?.email ?? 'A contributor';
+        await inApp(c, { userId: t.sender_id, kind: 'inbound_received', title: `${who} sent "${f.display_name}" for "${t.title}"`, transferId: t.id, dedupeKey: `inbound:${f.id}` });
+        const owner = (await c.query<{ email: string }>(`SELECT email FROM users WHERE id = $1`, [t.sender_id])).rows[0];
+        if (owner && up?.grant_id) {
+          await queueEmail(c, { kind: 'sender_activity', to: owner.email, toUserId: t.sender_id, transferId: t.id, grantId: up.grant_id, data: { kind: 'inbound_received', transferTitle: t.title, recipientEmail: who, link: new URL(`/sent/${t.id}`, ctx.config.publicUrl).toString(), detail: `${who} has sent you files` }, dedupeKey: `inboundmail:${up.grant_id}` });
+        }
+      }
     } else {
       const blocked = outcome.status === 'infected';
       await audit(c, { actorKind: 'system', eventType: blocked ? 'scan.blocked' : 'scan.failed', transferId: f.transfer_id, fileId: f.id, outcome: blocked ? 'denied' : 'failure', details: { status: outcome.status, detail } });
@@ -176,10 +187,10 @@ export async function sweepAbandonedUploads(ctx: AppContext) {
 // ------------------------------------------------------------------ outbox delivery
 export async function deliverOutbox(ctx: AppContext, job: ClaimedJob) {
   const id = Number(job.payload.outboxId);
-  const m = (await ctx.db.query<{ id: number; kind: TemplateKey; to_email: string; transfer_id: string | null; grant_id: string | null; data: Record<string, unknown>; status: string; attempts: number }>(`SELECT * FROM outbox_messages WHERE id = $1`, [id])).rows[0];
+  const m = (await ctx.db.query<{ id: number; kind: TemplateKey | RequestTemplateKey; to_email: string; transfer_id: string | null; grant_id: string | null; data: Record<string, unknown>; status: string; attempts: number }>(`SELECT * FROM outbox_messages WHERE id = $1`, [id])).rows[0];
   if (!m || m.status === 'sent' || m.status === 'suppressed') return;
   // Recheck state before sending anything transfer-related: never send stale invitations/codes/reminders.
-  if (m.transfer_id && ['transfer_available', 'verification_code', 'expiring_soon_recipient'].includes(m.kind)) {
+  if (m.transfer_id && ['transfer_available', 'verification_code', 'expiring_soon_recipient', 'file_request'].includes(m.kind)) {
     const t = (await ctx.db.query<TransferRow>(`SELECT * FROM transfers WHERE id = $1`, [m.transfer_id])).rows[0];
     const g = m.grant_id ? (await ctx.db.query<{ status: string }>(`SELECT status::text FROM recipient_grants WHERE id = $1`, [m.grant_id])).rows[0] : null;
     if (!t || !isAccessible(t, ctx.clock.now()) || (g && g.status !== 'invited')) {
@@ -189,7 +200,8 @@ export async function deliverOutbox(ctx: AppContext, job: ClaimedJob) {
     }
   }
   const tctx = await templateContext(ctx);
-  const render = templates[m.kind] as (c: TemplateContext, d: never) => { subject: string; text: string; html: string };
+  const all = { ...templates, ...requestTemplates } as Record<string, (c: TemplateContext, d: never) => { subject: string; text: string; html: string }>;
+  const render = all[m.kind]!;
   const rendered = render(tctx, m.data as never);
   await ctx.db.query(`UPDATE outbox_messages SET status = 'sending', attempts = attempts + 1 WHERE id = $1`, [m.id]);
   try {
@@ -197,7 +209,7 @@ export async function deliverOutbox(ctx: AppContext, job: ClaimedJob) {
     await ctx.db.tx(async (c) => {
       // Scrub secrets (links carrying invitation tokens, one-time codes) once the message has left the system.
       await c.query(`UPDATE outbox_messages SET status = 'sent', sent_at = now(), provider_response = $2, data = (data - 'code' - 'link') || '{"redacted":true}'::jsonb WHERE id = $1`, [m.id, res.response]);
-      if (m.kind === 'transfer_available') await audit(c, { actorKind: 'system', eventType: 'invitation.accepted_by_provider', transferId: m.transfer_id, grantId: m.grant_id, details: { note: 'SMTP accepted; inbox delivery not confirmed' } });
+      if (m.kind === 'transfer_available' || m.kind === 'file_request') await audit(c, { actorKind: 'system', eventType: 'invitation.accepted_by_provider', transferId: m.transfer_id, grantId: m.grant_id, details: { note: 'SMTP accepted; inbox delivery not confirmed' } });
       else if (m.kind === 'verification_code') await audit(c, { actorKind: 'system', eventType: 'recipient.code_sent', transferId: m.transfer_id, grantId: m.grant_id, outcome: 'info' });
       await resolveAlert(c, 'smtp_failure');
     });
@@ -206,7 +218,7 @@ export async function deliverOutbox(ctx: AppContext, job: ClaimedJob) {
     const dead = job.attempts >= job.max_attempts;
     await ctx.db.tx(async (c) => {
       await c.query(`UPDATE outbox_messages SET status = $2, last_error = $3, data = CASE WHEN $4 THEN (data - 'code' - 'link') || '{"redacted":true}'::jsonb ELSE data END WHERE id = $1`, [m.id, dead ? 'failed' : 'queued', msg.slice(0, 300), dead]);
-      if (m.kind === 'transfer_available' && dead) await audit(c, { actorKind: 'system', eventType: 'invitation.failed', transferId: m.transfer_id, grantId: m.grant_id, outcome: 'failure', details: { error: msg.slice(0, 200) } });
+      if ((m.kind === 'transfer_available' || m.kind === 'file_request') && dead) await audit(c, { actorKind: 'system', eventType: 'invitation.failed', transferId: m.transfer_id, grantId: m.grant_id, outcome: 'failure', details: { error: msg.slice(0, 200) } });
       if (job.attempts >= 3) await raiseAlert(ctx, c, { kind: 'smtp', severity: 'warning', message: `Email delivery failing: ${msg.slice(0, 120)}`, dedupeKey: 'smtp_failure' });
     });
     throw e;
@@ -217,6 +229,7 @@ export async function deliverOutbox(ctx: AppContext, job: ClaimedJob) {
 export async function notifyExpiring(ctx: AppContext, job: ClaimedJob) {
   const t = (await ctx.db.query<TransferRow>(`SELECT * FROM transfers WHERE id = $1`, [String(job.payload.transferId)])).rows[0];
   if (!t || !isAccessible(t, ctx.clock.now())) return;
+  if (t.direction === 'inbound') return; // a file request has no "not yet downloaded" recipients to chase
   const np = await ctx.settings.get('notifications');
   const grants = (await ctx.db.query<{ id: string; email: string; all_files_completed_at: Date | null; token_hash: Buffer }>(`SELECT id, email, all_files_completed_at, token_hash FROM recipient_grants WHERE transfer_id = $1 AND status = 'invited'`, [t.id])).rows;
   const outstanding = grants.filter((g) => !g.all_files_completed_at);

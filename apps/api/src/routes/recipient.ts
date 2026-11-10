@@ -6,6 +6,8 @@ import { cookieOptions } from '../auth/sessions.js';
 import * as R from '../services/recipients.js';
 import { releasedFile, streamFile, streamZip } from '../services/downloads.js';
 import { audit } from '../lib/audit.js';
+import * as Q from '../services/requests.js';
+import { AddFileSchema } from '../services/transfers.js';
 
 /**
  * External recipient API. No admin shell, no third-party scripts, no information before authorisation.
@@ -45,6 +47,7 @@ export async function recipientRoutes(app: FastifyInstance, ctx: AppContext) {
       theme: branding.theme,
       colourScheme: branding.colourScheme,
       recipientHint: l && (state === 'needs_verification') ? R.maskEmail(l.grant.email) : null,
+      purpose: l && (state === 'needs_verification' || state === 'bearer_ready') ? (l.transfer.direction === 'inbound' ? 'upload' : 'download') : undefined,
       verification: state === 'needs_verification' && l ? { codeTtlSeconds: l.transfer.effective_policy.codeTtlSeconds ?? verification.codeTtlSeconds, resendCooldownSeconds: l.transfer.effective_policy.resendCooldownSeconds ?? verification.resendCooldownSeconds } : null,
     };
   });
@@ -67,7 +70,7 @@ export async function recipientRoutes(app: FastifyInstance, ctx: AppContext) {
       throw new HttpError(s.status, 'That code is not valid. Request a new code if it has expired.', 'bad_code');
     }
     reply.setCookie(R.RECIPIENT_COOKIE, s.token, { ...cookieOptions(ctx), path: `/api/r/${token}` });
-    return { ok: true, view: await R.authorisedView(ctx, ctx.db, l, s.session) };
+    return { ok: true, view: await viewFor(l, s.session) };
   });
 
   /** Bearer mode: explicit button press creates the session; a bare GET never does. */
@@ -77,8 +80,11 @@ export async function recipientRoutes(app: FastifyInstance, ctx: AppContext) {
     if (!l) throw notFound();
     const s = await ctx.db.tx((c) => R.bearerSession(ctx, c, l, actorFor(req)));
     reply.setCookie(R.RECIPIENT_COOKIE, s.token, { ...cookieOptions(ctx), path: `/api/r/${token}` });
-    return { ok: true, view: await R.authorisedView(ctx, ctx.db, l, s.session) };
+    return { ok: true, view: await viewFor(l, s.session) };
   });
+
+  /** Download recipients see the file list; contributors to a file request see the ask and their own uploads. */
+  const viewFor = (l: NonNullable<R.GrantLookup>, s: R.RecipientSessionRow) => (l.transfer.direction === 'inbound' ? Q.inboundView(ctx, ctx.db, l, s) : R.authorisedView(ctx, ctx.db, l, s));
 
   async function requireSession(req: FastifyRequest, token: string) {
     const l = await lookupOr404(token);
@@ -98,13 +104,26 @@ export async function recipientRoutes(app: FastifyInstance, ctx: AppContext) {
     if (!seen.rowCount) {
       await audit(ctx.db, { actorKind: s.mode === 'required' ? 'recipient' : 'anonymous', actorEmail: s.verified_email, actorSessionId: s.id, transferId: l.transfer.id, grantId: l.grant.id, eventType: 'recipient.page_viewed', ...actorFor(req) });
     }
-    return R.authorisedView(ctx, ctx.db, l, s);
+    return viewFor(l, s);
+  });
+
+  /** Contributor registers a file they are about to upload to a file request (then uploads it with tus). */
+  app.post('/api/r/:token/uploads', { config: { rateLimit: { max: 120, timeWindow: '10 minutes' } } }, async (req, reply) => {
+    const { token } = params.parse(req.params);
+    const { l, s } = await requireSession(req, token);
+    if (l.transfer.direction !== 'inbound') throw notFound();
+    const input = AddFileSchema.parse(req.body);
+    const f = await ctx.db.tx((c) => Q.addInboundFile(ctx, c, l, s, input, actorFor(req)));
+    reply.status(201);
+    return { file: { id: f.id, name: f.display_name, sizeBytes: f.size_bytes }, uploadId: f.upload_id, tusEndpoint: `/api/r/${token}/tus` };
   });
 
   const fileParams = z.object({ token: z.string().min(40).max(50), fileId: z.string().uuid() });
   const fileHandler = async (req: FastifyRequest, reply: Parameters<typeof streamFile>[2]) => {
     const { token, fileId } = fileParams.parse(req.params);
     const { l, s } = await requireSession(req, token);
+    // Contributors to a file request can never download anything, including their own uploads.
+    if (l.transfer.direction === 'inbound') throw notFound('File not found');
     const f = await releasedFile(ctx.db, l.transfer.id, fileId);
     if (!f) throw notFound('File not found');
     return streamFile(ctx, req, reply, l, s, f, actorFor(req));
@@ -115,6 +134,7 @@ export async function recipientRoutes(app: FastifyInstance, ctx: AppContext) {
   app.get('/api/r/:token/zip', { config: { rateLimit: { max: 30, timeWindow: '10 minutes' } } }, async (req, reply) => {
     const { token } = params.parse(req.params);
     const { l, s } = await requireSession(req, token);
+    if (l.transfer.direction === 'inbound') throw notFound();
     return streamZip(ctx, req, reply, l, s, actorFor(req));
   });
 

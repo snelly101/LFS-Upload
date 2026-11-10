@@ -24,6 +24,8 @@ export const TransferPolicySchema = z.object({
   allowExpiryExtension: z.boolean().default(true),
   /** Whether files larger than the scanner limit may be released unscanned (default: no). */
   allowUnscannedOversizedRelease: z.boolean().default(false),
+  /** Whether staff may ask named, email-verified external people to send files in ("file requests"). */
+  allowFileRequests: z.boolean().default(true),
 });
 export type TransferPolicy = z.infer<typeof TransferPolicySchema>;
 

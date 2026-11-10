@@ -42,6 +42,8 @@ export async function recipientRoutes(app: FastifyInstance, ctx: AppContext) {
       supportEmail: branding.supportEmail,
       accentColour: branding.accentColour,
       logoDataUrl: branding.logoDataUrl,
+      theme: branding.theme,
+      colourScheme: branding.colourScheme,
       recipientHint: l && (state === 'needs_verification') ? R.maskEmail(l.grant.email) : null,
       verification: state === 'needs_verification' && l ? { codeTtlSeconds: l.transfer.effective_policy.codeTtlSeconds ?? verification.codeTtlSeconds, resendCooldownSeconds: l.transfer.effective_policy.resendCooldownSeconds ?? verification.resendCooldownSeconds } : null,
     };

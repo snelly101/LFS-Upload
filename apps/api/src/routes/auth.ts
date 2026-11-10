@@ -55,6 +55,8 @@ export async function authRoutes(app: FastifyInstance, ctx: AppContext) {
       accentColour: branding.accentColour,
       logoDataUrl: branding.logoDataUrl,
       supportEmail: branding.supportEmail,
+      theme: branding.theme,
+      colourScheme: branding.colourScheme,
     };
   });
 

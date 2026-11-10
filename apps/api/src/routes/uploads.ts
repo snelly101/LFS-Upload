@@ -7,7 +7,7 @@ import type { AppContext } from '../context.js';
 import { requireAuth, actor } from '../auth/guards.js';
 import { audit } from '../lib/audit.js';
 import { enqueue } from '../lib/jobs.js';
-import { recomputeTransferStatus, type FileRow } from '../services/transfers.js';
+import { effectiveMaxFileBytes, recomputeTransferStatus, type FileRow } from '../services/transfers.js';
 import type { AuthState } from '../auth/guards.js';
 import { inApp } from '../services/notifications.js';
 
@@ -54,7 +54,7 @@ export async function uploadRoutes(app: FastifyInstance, ctx: AppContext) {
     datastore: store,
     relativeLocation: true,
     respectForwardedHeaders: false,
-    maxSize: async () => (await ctx.settings.get('transferPolicy')).maxFileBytes,
+    maxSize: async () => effectiveMaxFileBytes(await ctx.settings.get('transferPolicy'), ctx.config.CLAMD_MAX_STREAM_BYTES),
     namingFunction: async (req, metadata) => {
       const raw = (req as unknown as TusReq).runtime?.node?.req as RawWithAuth;
       const uploadId = metadata?.uploadId ?? '';

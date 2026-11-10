@@ -156,6 +156,15 @@ export async function orgUsage(q: Queryable): Promise<{ usedBytes: number; reser
   return { usedBytes: u.rows[0]?.used ?? 0, reservedBytes: r.rows[0]?.reserved ?? 0 };
 }
 
+/**
+ * The largest file that can actually be sent. Files above the scanner limit can never pass the
+ * malware scan, so unless the administrator explicitly allows unscanned release they are refused
+ * before upload rather than after.
+ */
+export function effectiveMaxFileBytes(tp: { maxFileBytes: number; allowUnscannedOversizedRelease: boolean }, scannerMaxBytes: number): number {
+  return tp.allowUnscannedOversizedRelease ? tp.maxFileBytes : Math.min(tp.maxFileBytes, scannerMaxBytes);
+}
+
 export const AddFileSchema = z.object({
   name: z.string().min(1).max(1000),
   sizeBytes: z.number().int().min(0),
@@ -171,7 +180,11 @@ export async function addFile(ctx: AppContext, q: Queryable, user: { id: string;
   if (!MUTABLE.has(t.status)) throw conflict('Transfer has been sent and is immutable', 'immutable');
   const s = await ctx.settings.all();
   const tp = s.transferPolicy;
-  if (input.sizeBytes > tp.maxFileBytes) throw badRequest(`File exceeds the maximum size per file`, 'file_too_large', { maxFileBytes: tp.maxFileBytes });
+  const maxFile = effectiveMaxFileBytes(tp, ctx.config.CLAMD_MAX_STREAM_BYTES);
+  if (input.sizeBytes > maxFile) {
+    const scanLimited = maxFile < tp.maxFileBytes;
+    throw badRequest(scanLimited ? 'This file is larger than the malware scanner can check, so it cannot be sent' : 'File exceeds the maximum size per file', 'file_too_large', { maxFileBytes: maxFile, scanLimited });
+  }
   const files = await q.query<FileRow>(`SELECT * FROM transfer_files WHERE transfer_id = $1 AND upload_status <> 'abandoned'`, [t.id]);
   if (files.rows.length >= tp.maxFilesPerTransfer) throw badRequest('Too many files in this transfer', 'too_many_files', { max: tp.maxFilesPerTransfer });
   const total = files.rows.reduce((n, f) => n + f.size_bytes, 0) + input.sizeBytes;

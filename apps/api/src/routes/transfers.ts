@@ -21,6 +21,8 @@ export async function transferRoutes(app: FastifyInstance, ctx: AppContext) {
       quota: { quotaBytes: quota, usedBytes: usage.usedBytes, reservedBytes: usage.reservedBytes },
       disk: { availableBytes: disk.availableBytes, totalBytes: disk.totalBytes },
       scannerMaxBytes: ctx.config.CLAMD_MAX_STREAM_BYTES,
+      effectiveMaxFileBytes: T.effectiveMaxFileBytes(s.transferPolicy, ctx.config.CLAMD_MAX_STREAM_BYTES),
+      scanLimited: !s.transferPolicy.allowUnscannedOversizedRelease && ctx.config.CLAMD_MAX_STREAM_BYTES < s.transferPolicy.maxFileBytes,
     };
   });
 

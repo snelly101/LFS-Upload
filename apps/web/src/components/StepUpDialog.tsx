@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { startAuthentication } from '@simplewebauthn/browser';
+import type { startAuthentication } from '@simplewebauthn/browser';
 import { Dialog } from './Dialog';
 import { post, errorMessage } from '../api';
 import type { MfaStatus } from '../lib/types';
@@ -26,7 +26,7 @@ export function StepUpDialog({ mfa, onDone }: { mfa: MfaStatus | undefined; onDo
     setErr(null);
     try {
       const optionsJSON = await post<Parameters<typeof startAuthentication>[0]['optionsJSON']>('/api/auth/step-up/passkey/options');
-      const response = await startAuthentication({ optionsJSON });
+      const response = await (await import('@simplewebauthn/browser')).startAuthentication({ optionsJSON });
       await post('/api/auth/step-up/passkey/verify', { response });
       onDone(true);
     } catch (x) {

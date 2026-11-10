@@ -1,17 +1,24 @@
+import { Suspense } from 'react';
 import { NavLink, Outlet, Navigate, useLocation } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { get } from '../api';
+import { Brand } from './Brand';
+import { useLiveEvents, usePollInterval } from '../lib/live';
 
 /**
  * Staff shell: a single top strip. Sending is the home page, so there is no navigation to "get to"
  * the main job. "Sent" is the history; Administration is one link for admins only.
  */
-export function Shell({ width = 'narrow' }: { width?: 'narrow' | 'wide' }) {
+export function Shell() {
   const { me, loading, options, logout } = useAuth();
   const loc = useLocation();
-  const notif = useQuery({ queryKey: ['notifications'], queryFn: () => get<{ unread: number }>('/api/notifications'), enabled: !!me?.user && me.user.authLevel === 'full', refetchInterval: 60_000 });
-  if (loading) return <div className="content">Loading…</div>;
+  const qc = useQueryClient();
+  const signedIn = !!me?.user && me.user.authLevel === 'full';
+  useLiveEvents(qc, signedIn);
+  const poll = usePollInterval(60_000);
+  const notif = useQuery({ queryKey: ['notifications'], queryFn: () => get<{ unread: number }>('/api/notifications'), enabled: signedIn, refetchInterval: poll });
+  if (loading) return <div className="loading" role="status">Loading…</div>;
   if (!me?.user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname)}`} replace />;
   if (me.user.authLevel !== 'full') return <Navigate to="/login" replace />;
   const user = me.user;
@@ -19,13 +26,13 @@ export function Shell({ width = 'narrow' }: { width?: 'narrow' | 'wide' }) {
   const initials = (user.displayName || user.email).split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map((s) => s[0]!.toUpperCase()).join('');
   const unread = notif.data?.unread ?? 0;
   const isAdminArea = loc.pathname.startsWith('/admin');
+  const width = isAdminArea ? 'wide' : loc.pathname.startsWith('/activity') || loc.pathname.startsWith('/account') || loc.pathname.startsWith('/notifications') ? 'mid' : 'narrow';
   return (
     <div className="shell">
       <a href="#main" className="skip-link">Skip to content</a>
       <header className="strip">
-        <NavLink to={canSend ? '/' : '/activity'} className="strip-brand">
-          {options?.logoDataUrl ? <img src={options.logoDataUrl} alt="" /> : <span className="mark" aria-hidden="true" />}
-          <span>{options?.productName ?? 'Together Housing Secure File Send'}</span>
+        <NavLink to={canSend ? '/' : '/activity'} className="brand" aria-label={`${options?.productName ?? 'Secure File Send'} home`}>
+          <Brand productName={options?.productName ?? 'Secure File Send'} organisationName={options?.organisationName ?? ''} logoDataUrl={options?.logoDataUrl} />
         </NavLink>
         <nav className="strip-nav" aria-label="Main">
           {canSend && <NavLink to="/" end>Send</NavLink>}
@@ -40,8 +47,7 @@ export function Shell({ width = 'narrow' }: { width?: 'narrow' | 'wide' }) {
           </summary>
           <div className="menu">
             <div className="who">
-              {user.displayName || user.email}
-              <br />
+              <strong>{user.displayName || user.email}</strong>
               {user.email}
             </div>
             <NavLink to="/notifications">Notifications {unread > 0 && <span className="badge-count">{unread}</span>}</NavLink>
@@ -51,8 +57,10 @@ export function Shell({ width = 'narrow' }: { width?: 'narrow' | 'wide' }) {
           </div>
         </details>
       </header>
-      <main id="main" className={`content ${isAdminArea || width === 'wide' ? 'wide' : 'narrow'}`} tabIndex={-1}>
-        <Outlet />
+      <main id="main" className={`content ${width}`} tabIndex={-1}>
+        <Suspense fallback={<div className="loading" role="status">Loading…</div>}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );

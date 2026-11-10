@@ -9,6 +9,7 @@ import { Receipt } from '../components/Receipt';
 import { Steps, headline } from '../components/Steps';
 import { fmt, fmtLong, countdown, toLocalInput, fromLocalInput } from '../lib/time';
 import { refCode } from '../lib/labels';
+import { usePollInterval } from '../lib/live';
 
 export { prefLabel } from '../lib/labels';
 
@@ -17,12 +18,14 @@ type DialogKind = null | 'revoke' | 'revoke-grant' | 'add-recipient' | 'extend' 
 export function TransferDetailPage() {
   const { id } = useParams();
   const qc = useQueryClient();
+  // Live events refresh this page; polling is only the slow fallback when the stream is down.
+  const poll = usePollInterval(60_000);
   const t = useQuery({
     queryKey: ['transfer', id],
     queryFn: () => get<TransferDetail>(`/api/transfers/${id}`),
-    refetchInterval: (q) => (['uploading', 'scanning', 'active', 'sending'].includes(q.state.data?.status ?? '') || q.state.data?.deletionStatus === 'pending' || q.state.data?.deletionStatus === 'in_progress' ? 10_000 : false),
+    refetchInterval: (q) => (['uploading', 'scanning', 'active', 'sending'].includes(q.state.data?.status ?? '') || q.state.data?.deletionStatus === 'pending' || q.state.data?.deletionStatus === 'in_progress' ? poll : false),
   });
-  const act = useQuery({ queryKey: ['transfer-activity', id], queryFn: () => get<{ events: ActivityEvent[] }>(`/api/transfers/${id}/activity`), refetchInterval: 15_000 });
+  const act = useQuery({ queryKey: ['transfer-activity', id], queryFn: () => get<{ events: ActivityEvent[] }>(`/api/transfers/${id}/activity`), refetchInterval: poll });
   const [dialog, setDialog] = useState<DialogKind>(null);
   const [grant, setGrant] = useState<GrantView | null>(null);
   const [reason, setReason] = useState('');
@@ -70,19 +73,32 @@ export function TransferDetailPage() {
         refresh();
       })
       .catch((e) => setFlash(errorMessage(e)));
+  const remind = (g: GrantView) =>
+    post(`/api/transfers/${d.id}/grants/${g.id}/remind`, {})
+      .then(() => {
+        setFlash(`A reminder is on its way to ${g.email}.`);
+        refresh();
+      })
+      .catch((e) => setFlash(errorMessage(e)));
+  const closeMenus = () => document.querySelectorAll('details.menu-btn[open]').forEach((el) => el.removeAttribute('open'));
 
   return (
     <>
       <p className="small" style={{ marginBottom: 14 }}><Link to="/sent">← Sent</Link></p>
-      <h1 className="lede">{headline(d)}</h1>
-      <p className="lede-sub">
-        <strong>{d.title || 'Untitled'}</strong> · {d.fileCount} file{d.fileCount === 1 ? '' : 's'}, {formatBytes(d.totalBytes)} · {d.sentAt ? `sent ${fmt(d.sentAt)}` : `started ${fmt(d.createdAt)}`} · <span className="mono small">REF {refCode(d.id)}</span>
-      </p>
+      <div className="row-between" style={{ alignItems: 'flex-start', flexWrap: 'nowrap', gap: 20 }}>
+        <div style={{ minWidth: 0 }}>
+          <h1 className="lede">{headline(d)}</h1>
+          <p className="lede-sub">
+            <strong>{d.title || 'Untitled'}</strong> · {d.fileCount} file{d.fileCount === 1 ? '' : 's'}, {formatBytes(d.totalBytes)} · {d.sentAt ? `sent ${fmt(d.sentAt)}` : `started ${fmt(d.createdAt)}`}
+          </p>
+        </div>
+        <span className={`stamp stamp-${state.tone} lg`} style={{ flex: 'none', marginTop: 6 }}>{state.label}</span>
+      </div>
       <p className="facts">
-        <span><strong className={`word word-${state.tone}`}>{state.label}</strong></span>
-        <span>{isLive ? <>Until <strong>{fmtLong(d.expiresAt)}</strong> ({countdown(d.expiresAt)})</> : <>Expiry was {fmtLong(d.expiresAt)}</>}</span>
+        <span>{isLive ? <>Available until <strong>{fmtLong(d.expiresAt)}</strong> ({countdown(d.expiresAt)})</> : <>Expiry was {fmtLong(d.expiresAt)}</>}</span>
         <span>{d.verificationMode === 'required' ? 'Email code required' : 'No verification (bearer link)'}</span>
         {d.downloadLimitPerRecipient !== null && <span>Max {d.downloadLimitPerRecipient} download{d.downloadLimitPerRecipient === 1 ? '' : 's'} per recipient per file</span>}
+        <span className="ref">REF {refCode(d.id)}</span>
       </p>
       <div className="actions">
         {isUnsent && <Link to={`/?id=${d.id}`} className="btn btn-primary">Continue</Link>}
@@ -91,7 +107,7 @@ export function TransferDetailPage() {
         {isLive && <button className="btn btn-danger" onClick={() => { setErr(null); setDeleteNow(false); setDialog('revoke'); }}>Stop sharing</button>}
         {!isLive && !isUnsent && d.deletionStatus === 'none' && <button className="btn btn-danger" onClick={() => { setErr(null); setDialog('delete'); }}>Delete files now</button>}
         {isUnsent && <button className="btn btn-danger" onClick={() => { setErr(null); setDialog('delete'); }}>Discard</button>}
-        <button className="btn" style={{ marginLeft: 'auto' }} onClick={() => window.location.assign('/')}>Send more files</button>
+        <button className="btn push" onClick={() => window.location.assign('/')}>Send more files</button>
       </div>
 
       {flash && <div className="notice notice-info" role="status">{flash} <button className="btn-link" onClick={() => setFlash(null)}>Dismiss</button></div>}
@@ -118,10 +134,11 @@ export function TransferDetailPage() {
               <div className="acts">
                 {isLive && g.status === 'invited' && (
                   <details className="menu-btn">
-                    <summary className="btn btn-sm" aria-label={`Actions for ${g.email}`}>⋯</summary>
+                    <summary className="btn btn-sm" aria-label={`Actions for ${g.email}`}>···</summary>
                     <div className="menu">
-                      <button type="button" onClick={() => void resend(g)}>Send a fresh link</button>
-                      <button type="button" className="danger" onClick={() => { setGrant(g); setErr(null); setDialog('revoke-grant'); }}>Remove access</button>
+                      {!g.allFilesCompletedAt && <button type="button" onClick={() => { closeMenus(); void remind(g); }}>Send a reminder</button>}
+                      <button type="button" onClick={() => { closeMenus(); void resend(g); }}>Send a fresh link</button>
+                      <button type="button" className="danger" onClick={() => { closeMenus(); setGrant(g); setErr(null); setDialog('revoke-grant'); }}>Remove access</button>
                     </div>
                   </details>
                 )}

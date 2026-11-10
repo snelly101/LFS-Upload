@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
+import type { startAuthentication, startRegistration } from '@simplewebauthn/browser';
+import { Brand } from '../components/Brand';
+import { TotpSetup } from '../components/Qr';
 import { useAuth } from '../auth/AuthContext';
 import { post, errorMessage } from '../api';
 
@@ -21,13 +23,15 @@ export function AuthFrame({ children, title }: { children: React.ReactNode; titl
   const { options } = useAuth();
   return (
     <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-brand">
-          {options?.logoDataUrl ? <img src={options.logoDataUrl} alt="" /> : <span className="mark" aria-hidden="true" />}
-          <span>{options?.productName ?? 'Together Housing Secure File Send'}</span>
-        </div>
-        {title && <h1>{title}</h1>}
-        {children}
+      <div>
+        <main className="auth-card">
+          <div className="auth-brand brand">
+            <Brand productName={options?.productName ?? 'Secure File Send'} organisationName={options?.organisationName ?? ''} logoDataUrl={options?.logoDataUrl} large />
+          </div>
+          {title && <h1>{title}</h1>}
+          {children}
+        </main>
+        {options?.supportEmail && <p className="auth-foot">Trouble signing in? <a href={`mailto:${options.supportEmail}`}>{options.supportEmail}</a></p>}
       </div>
     </div>
   );
@@ -94,7 +98,7 @@ export function LoginPage() {
   const passkeyLogin = () =>
     void run(async () => {
       const optionsJSON = await post<Parameters<typeof startAuthentication>[0]['optionsJSON']>('/api/auth/mfa/passkey/options');
-      const response = await startAuthentication({ optionsJSON });
+      const response = await (await import('@simplewebauthn/browser')).startAuthentication({ optionsJSON });
       await post('/api/auth/mfa/passkey/verify', { response });
       await finish();
     });
@@ -114,7 +118,7 @@ export function LoginPage() {
   const enrolPasskey = () =>
     void run(async () => {
       const optionsJSON = await post<Parameters<typeof startRegistration>[0]['optionsJSON']>('/api/auth/enrol/passkey/options');
-      const response = await startRegistration({ optionsJSON });
+      const response = await (await import('@simplewebauthn/browser')).startRegistration({ optionsJSON });
       const r = await post<{ recoveryCodes: string[] | null }>('/api/auth/enrol/passkey/verify', { response, label: 'Passkey' });
       setRecoveryCodes(r.recoveryCodes);
       setStage('recovery-codes');
@@ -126,7 +130,7 @@ export function LoginPage() {
         {err && <div className="notice notice-err" role="alert">{err}</div>}
         {methods.passkey && (
           <p>
-            <button className="btn btn-primary" onClick={passkeyLogin} disabled={busy} style={{ width: '100%', justifyContent: 'center' }}>Use passkey</button>
+            <button className="btn btn-primary btn-block" onClick={passkeyLogin} disabled={busy}>Use passkey</button>
           </p>
         )}
         {(methods.totp || methods.recovery) && (
@@ -139,7 +143,7 @@ export function LoginPage() {
                 <input id="mfa-code" className="input mono" value={code} onChange={(e) => setCode(e.target.value)} placeholder="xxxx-xxxx-xxxx" autoFocus required />
               )}
             </div>
-            <button className="btn btn-primary" disabled={busy} style={{ width: '100%', justifyContent: 'center' }}>Continue</button>
+            <button className="btn btn-primary btn-block" disabled={busy}>Continue</button>
           </form>
         )}
         <p className="small" style={{ marginTop: 14 }}>
@@ -166,12 +170,8 @@ export function LoginPage() {
   if (stage === 'enrol-totp' && totpSetup) {
     return (
       <AuthFrame title="Authenticator app">
-        <p>Add this account to your authenticator app, then enter the code it shows.</p>
-        <p className="small">Open this link on the device with the app, or enter the key manually:</p>
-        <p>
-          <a href={totpSetup.otpauthUrl} className="small" style={{ overflowWrap: 'anywhere' }}>Add to authenticator app</a>
-        </p>
-        <p className="mono" style={{ overflowWrap: 'anywhere', background: 'var(--surface-muted)', padding: 8, borderRadius: 4 }}>{totpSetup.secretBase32.match(/.{1,4}/g)?.join(' ')}</p>
+        <p>Scan this with your authenticator app, then enter the 6-digit code it shows.</p>
+        <TotpSetup otpauthUrl={totpSetup.otpauthUrl} secretBase32={totpSetup.secretBase32} />
         {err && <div className="notice notice-err" role="alert">{err}</div>}
         <form onSubmit={confirmTotp}>
           <div className="field">
@@ -210,7 +210,7 @@ export function LoginPage() {
       {err && <div className="notice notice-err" role="alert">{err}</div>}
       {options?.ssoEnabled && (
         <p>
-          <a className="btn btn-primary" href="/api/auth/sso/start" style={{ width: '100%', justifyContent: 'center' }}>Sign in with {options.ssoLabel}</a>
+          <a className="btn btn-primary btn-block" href="/api/auth/sso/start">Sign in with {options.ssoLabel}</a>
         </p>
       )}
       {options?.localLoginEnabled && (
@@ -223,7 +223,7 @@ export function LoginPage() {
             <label htmlFor="password">Password</label>
             <input id="password" className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
-          <button className="btn btn-primary" disabled={busy} style={{ width: '100%', justifyContent: 'center' }}>Continue</button>
+          <button className="btn btn-primary btn-block" disabled={busy}>Continue</button>
           <p className="small" style={{ marginTop: 12 }}>
             <Link to="/forgot-password">Forgotten your password?</Link>
           </p>

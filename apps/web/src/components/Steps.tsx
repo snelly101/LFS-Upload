@@ -19,7 +19,7 @@ export function Steps({ g, totalFiles, verificationMode, transferLive }: { g: Gr
   const s2 = revoked ? 'stop' : opened ? 'done' : s1 === 'done' && transferLive ? 'on' : 'off';
   const s3 = revoked ? 'stop' : done ? 'done' : partial ? 'on' : opened && transferLive ? 'on' : 'off';
   return (
-    <ol className="steps" aria-label={`Progress for ${g.email}`}>
+    <ol className="track" aria-label={`Progress for ${g.email}`}>
       <li className={cls(s1)}>
         {sentFailed ? 'Not delivered' : sentDone ? 'Sent' : sent ? 'Sending' : 'Not sent'}
         <small>{sentFailed ? 'mail server refused' : g.invitedAt ? fmtShort(g.invitedAt) : ''}</small>

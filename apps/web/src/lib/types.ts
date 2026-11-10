@@ -19,4 +19,6 @@ export interface AuthOptions {
   accentColour: string;
   logoDataUrl: string | null;
   supportEmail: string | null;
+  theme?: 'civic' | 'clear';
+  colourScheme?: 'auto' | 'light' | 'dark';
 }

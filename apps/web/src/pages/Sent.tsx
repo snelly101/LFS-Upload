@@ -5,6 +5,7 @@ import { formatBytes, type TransferSummary } from '@securesend/shared';
 import { get } from '../api';
 import { transferState } from '../components/Status';
 import { fmt, countdown } from '../lib/time';
+import { usePollInterval } from '../lib/live';
 
 const FILTERS = [
   ['all', 'Everything'],
@@ -28,13 +29,13 @@ function Row({ t }: { t: TransferSummary }) {
   const tone = s.tone;
   return (
     <Link to={unsent ? `/?id=${t.id}` : `/sent/${t.id}`} className="sent-row">
-      <div>
+      <div style={{ minWidth: 0 }}>
         <div className="t">{t.title || 'Untitled'}</div>
         <div className="to">{to}</div>
       </div>
-      <div className="small">
-        <span className={`word word-${tone}`}>{s.label}</span>
-        <div className="muted">{stand}</div>
+      <div>
+        <span className={`stamp stamp-${tone}`}>{s.label}</span>
+        <div className="standing">{stand}</div>
       </div>
       <div className="side">
         <strong>{t.fileCount} file{t.fileCount === 1 ? '' : 's'} · {formatBytes(t.totalBytes)}</strong>
@@ -50,10 +51,11 @@ export function SentPage() {
   const status = params.get('status') ?? 'all';
   const page = Number(params.get('page') ?? '1');
   const [draftQ, setDraftQ] = useState(q);
+  const poll = usePollInterval(60_000);
   const query = useQuery({
     queryKey: ['transfers', q, status, page],
     queryFn: () => get<{ items: TransferSummary[]; total: number }>(`/api/transfers?q=${encodeURIComponent(q)}&status=${status}&page=${page}&pageSize=25`),
-    refetchInterval: 15_000,
+    refetchInterval: poll,
   });
   const set = (p2: Record<string, string>) => {
     const p = new URLSearchParams(params);
@@ -106,7 +108,8 @@ export function SentPage() {
 
 /** The last few sends, shown under the composer so the home page covers the everyday case. */
 export function RecentSends() {
-  const q = useQuery({ queryKey: ['transfers', 'recent'], queryFn: () => get<{ items: TransferSummary[]; total: number }>('/api/transfers?pageSize=50'), refetchInterval: 20_000 });
+  const poll = usePollInterval(60_000);
+  const q = useQuery({ queryKey: ['transfers', 'recent'], queryFn: () => get<{ items: TransferSummary[]; total: number }>('/api/transfers?pageSize=5'), refetchInterval: poll });
   const items = (q.data?.items ?? []).slice(0, 5);
   if (!items.length) return null;
   return (

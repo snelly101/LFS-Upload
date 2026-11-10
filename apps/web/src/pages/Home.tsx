@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import * as tus from 'tus-js-client';
+import type * as Tus from 'tus-js-client';
 import { formatBytes, formatDuration, formatRate, type TransferDetail, type TransferFileView, type TransferPolicy, type TransferSummary } from '@securesend/shared';
 import { get, post, patch, put, del, errorMessage } from '../api';
 import { Picker } from '../components/Picker';
@@ -17,6 +17,9 @@ interface PolicyResponse {
   quota: { quotaBytes: number; usedBytes: number; reservedBytes: number };
   disk: { availableBytes: number; totalBytes: number };
   scannerMaxBytes: number;
+  /** Largest file that can actually be sent (the scanner limit unless unscanned release is allowed). */
+  effectiveMaxFileBytes?: number;
+  scanLimited?: boolean;
 }
 
 interface LocalUpload {
@@ -24,7 +27,7 @@ interface LocalUpload {
   file: File;
   record: TransferFileView | null;
   uploadId: string | null;
-  upload: tus.Upload | null;
+  upload: Tus.Upload | null;
   sent: number;
   speed: number;
   status: 'registering' | 'queued' | 'uploading' | 'paused' | 'done' | 'error';
@@ -63,7 +66,12 @@ export function HomePage() {
   const [params] = useSearchParams();
   const existingId = params.get('id');
   const policyQ = useQuery({ queryKey: ['transfer-policy'], queryFn: () => get<PolicyResponse>('/api/transfers/policy') });
-  const recentQ = useQuery({ queryKey: ['transfers', 'recent'], queryFn: () => get<{ items: TransferSummary[]; total: number }>('/api/transfers?pageSize=50'), staleTime: 30_000 });
+  // Recipient suggestions come from /api/contacts; only if that is unavailable do we fall back to
+  // deriving them from recent transfers.
+  const [contactsUnavailable, setContactsUnavailable] = useState(false);
+  const [contactHits, setContactHits] = useState<{ email: string; timesUsed?: number }[] | null>(null);
+  const recentQ = useQuery({ queryKey: ['transfers', 'recent-recipients'], queryFn: () => get<{ items: TransferSummary[]; total: number }>('/api/transfers?pageSize=50'), staleTime: 60_000, enabled: contactsUnavailable });
+  const [rejected, setRejected] = useState<string[]>([]);
   const policy = policyQ.data;
 
   const [transfer, setTransfer] = useState<TransferDetail | null>(null);
@@ -183,7 +191,16 @@ export function HomePage() {
   };
   const update = (key: string, patchFn: (u: LocalUpload) => Partial<LocalUpload>) => setUploads((us) => us.map((u) => (u.key === key ? { ...u, ...patchFn(u) } : u)));
 
-  const startUpload = useCallback((u: LocalUpload, record: TransferFileView, uploadId: string) => {
+  const startUpload = useCallback(async (u: LocalUpload, record: TransferFileView, uploadId: string) => {
+    // Mark as starting straight away so the scheduler does not pick it twice while the uploader loads.
+    update(u.key, () => ({ status: 'uploading', lastTick: { t: Date.now(), b: 0 } }));
+    let tus: typeof Tus;
+    try {
+      tus = await import('tus-js-client');
+    } catch {
+      update(u.key, () => ({ status: 'error', error: 'The uploader could not be loaded. Check your connection and resume.' }));
+      return;
+    }
     const upload = new tus.Upload(u.file, {
       endpoint: '/api/uploads/tus',
       chunkSize: CHUNK,
@@ -219,13 +236,13 @@ export function HomePage() {
         announce(`${u.file.name} interrupted: ${e.message}`);
       },
       onShouldRetry: (e, retryAttempt) => {
-        const status = (e as tus.DetailedError).originalResponse?.getStatus() ?? 0;
+        const status = (e as Tus.DetailedError).originalResponse?.getStatus() ?? 0;
         if ([401, 403, 404, 409, 413].includes(status)) return false;
         return retryAttempt < 5;
       },
     });
     update(u.key, () => ({ upload, uploadId, record, status: 'uploading', lastTick: { t: Date.now(), b: 0 } }));
-    upload.findPreviousUploads().then((prev) => {
+    void upload.findPreviousUploads().then((prev) => {
       if (prev.length) upload.resumeFromPreviousUpload(prev[0]!);
       upload.start();
     });
@@ -234,13 +251,24 @@ export function HomePage() {
   useEffect(() => {
     const running = uploads.filter((u) => u.status === 'uploading').length;
     for (const u of uploads.filter((u) => u.status === 'queued').slice(0, Math.max(0, PARALLEL - running))) {
-      if (u.record && u.uploadId) startUpload(u, u.record, u.uploadId);
+      if (u.record && u.uploadId) void startUpload(u, u.record, u.uploadId);
     }
   }, [uploads, startUpload]);
 
   const addFiles = async (files: FileList | File[]) => {
     setErr(null);
-    const list = Array.from(files).filter((f) => f.size > 0 || f.type);
+    const all = Array.from(files).filter((f) => f.size > 0 || f.type);
+    // Refuse files that can never be sent before a single byte is uploaded.
+    const maxFile = policyQ.data?.effectiveMaxFileBytes ?? policyQ.data?.transferPolicy.maxFileBytes ?? Infinity;
+    const tooBig = all.filter((f) => f.size > maxFile);
+    const blockedExt = new Set(policyQ.data?.transferPolicy.blockedExtensions ?? []);
+    const badType = all.filter((f) => !tooBig.includes(f) && blockedExt.has((f.name.split('.').pop() ?? '').toLowerCase()) && f.name.includes('.'));
+    setRejected([
+      ...tooBig.map((f) => `${f.name} is ${formatBytes(f.size)}. The largest file that can be sent is ${formatBytes(maxFile, 0)}${policyQ.data?.scanLimited ? ', which is the most our malware scanner can check' : ''}.`),
+      ...badType.map((f) => `${f.name} was not added: files of type .${(f.name.split('.').pop() ?? '').toLowerCase()} are not permitted.`),
+    ]);
+    const list = all.filter((f) => !tooBig.includes(f) && !badType.includes(f));
+    if (tooBig.length + badType.length) announce(`${tooBig.length + badType.length} file${tooBig.length + badType.length === 1 ? ' was' : 's were'} not added.`);
     if (!list.length) return;
     let t: TransferDetail;
     try {
@@ -333,11 +361,29 @@ export function HomePage() {
     for (const t of recentQ.data?.items ?? []) for (const r of t.recipients) if (!seen.has(r.email)) seen.set(r.email, seen.size);
     return [...seen.keys()];
   }, [recentQ.data]);
+  useEffect(() => {
+    const q = emailDraft.trim().toLowerCase();
+    if (q.length < 2 || contactsUnavailable) {
+      setContactHits(null);
+      return;
+    }
+    let cancelled = false;
+    const id = setTimeout(() => {
+      get<{ contacts: { email: string; timesUsed?: number }[] }>(`/api/contacts?q=${encodeURIComponent(q)}`)
+        .then((r) => !cancelled && setContactHits(Array.isArray(r.contacts) ? r.contacts : []))
+        .catch(() => !cancelled && setContactsUnavailable(true));
+    }, 140);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+  }, [emailDraft, contactsUnavailable]);
   const suggestions = useMemo(() => {
     const q = emailDraft.trim().toLowerCase();
     if (q.length < 2) return [];
-    return recentEmails.filter((e) => e.includes(q) && !emails.includes(e)).slice(0, 5);
-  }, [emailDraft, recentEmails, emails]);
+    const pool = contactHits ? contactHits.map((c) => c.email.toLowerCase()) : recentEmails;
+    return pool.filter((e) => e.includes(q) && !emails.includes(e)).slice(0, 6);
+  }, [emailDraft, recentEmails, emails, contactHits]);
   const addEmails = (raw: string) => {
     const parts = raw.split(/[\s,;<>]+/).map((s) => s.trim().toLowerCase()).filter((s) => s.includes('@'));
     if (!parts.length) return;
@@ -452,20 +498,29 @@ export function HomePage() {
     const who = sent.grants.map((g) => g.email);
     return (
       <div className="home">
-        <section className="ticket" aria-live="polite">
-          <h1>Sent to {peopleLabel(who)}</h1>
-          <p>
-            {who.length === 1 ? <strong>{who[0]}</strong> : who.map((w) => <strong key={w}>{w}</strong>).reduce<React.ReactNode[]>((acc, el, i) => (i ? [...acc, ', ', el] : [el]), [])} will get an email with a personal link.
-            {sent.verificationMode === 'required' ? ' They enter a code we email them before anything is shown.' : ' Anyone with the link can download (no verification).'}
-          </p>
-          <p>
-            {sent.fileCount} file{sent.fileCount === 1 ? '' : 's'}, {formatBytes(sent.totalBytes)} · available until <strong>{fmtLong(sent.expiresAt)}</strong>, then deleted.
-          </p>
-          <p className="row" style={{ marginTop: 16 }}>
-            <Link to={`/sent/${sent.id}`} className="btn btn-primary">Track it</Link>
-            <button type="button" className="btn" onClick={() => window.location.assign('/')}>Send more files</button>
-            <span className="ref" style={{ marginLeft: 'auto' }}>REF {refCode(sent.id)}</span>
-          </p>
+        <section className="ticket" aria-live="polite" aria-label="Dispatch confirmation">
+          <div className="ticket-main">
+            <p className="caps" style={{ marginBottom: 6 }}>Dispatched</p>
+            <h1>Sent to {peopleLabel(who)}</h1>
+            <p>
+              {who.length === 1 ? <strong>{who[0]}</strong> : who.map((w) => <strong key={w}>{w}</strong>).reduce<React.ReactNode[]>((acc, el, i) => (i ? [...acc, ', ', el] : [el]), [])} will get an email with a personal link.
+              {sent.verificationMode === 'required' ? ' They enter a code we email them before anything is shown.' : ' Anyone with the link can download (no verification).'}
+            </p>
+            <p>
+              {sent.fileCount} file{sent.fileCount === 1 ? '' : 's'}, {formatBytes(sent.totalBytes)} · available until <strong>{fmtLong(sent.expiresAt)}</strong>, then deleted.
+            </p>
+            <p className="row" style={{ marginTop: 18, marginBottom: 0 }}>
+              <Link to={`/sent/${sent.id}`} className="btn btn-primary">Track it</Link>
+              <button type="button" className="btn" onClick={() => window.location.assign('/')}>Send more files</button>
+            </p>
+          </div>
+          <div className="ticket-stub">
+            <dl>
+              <div><dt>Reference</dt><dd>{refCode(sent.id)}</dd></div>
+              <div><dt>Items</dt><dd>{sent.fileCount} · {formatBytes(sent.totalBytes)}</dd></div>
+            </dl>
+            <span className="stamp stamp-ok lg">Sent</span>
+          </div>
         </section>
         <RecentSends />
       </div>
@@ -493,6 +548,13 @@ export function HomePage() {
       <div ref={liveRef} className="visually-hidden" aria-live="polite" />
       <input ref={fileInput} type="file" multiple className="visually-hidden" aria-label="Choose files to send" onChange={(e) => { if (e.target.files) void addFiles(e.target.files); e.target.value = ''; }} />
       {err && <div className="notice notice-err" role="alert">{err}</div>}
+      {rejected.length > 0 && (
+        <div className="notice notice-warn" role="alert">
+          <strong>{rejected.length === 1 ? 'One file was not added' : `${rejected.length} files were not added`}</strong>
+          {rejected.map((r) => <div key={r}>{r}</div>)}
+          <button type="button" className="btn-link" onClick={() => setRejected([])}>Dismiss</button>
+        </div>
+      )}
 
       {!hasFiles ? (
         <section className={`home-drop ${pageOver ? 'over' : ''}`} aria-labelledby="home-h">
@@ -501,7 +563,7 @@ export function HomePage() {
           <button type="button" className="btn btn-primary btn-lg" onClick={() => fileInput.current?.click()}>Choose files</button>
           {policy && (
             <p className="fine">
-              Up to {formatBytes(policy.transferPolicy.maxFileBytes, 0)} per file, {formatBytes(policy.transferPolicy.maxTransferBytes, 0)} in total. Every file is checked for malware before it can be sent.
+              Up to {formatBytes(policy.effectiveMaxFileBytes ?? policy.transferPolicy.maxFileBytes, 0)} per file{policy.scanLimited ? ' (the most our malware scanner can check)' : ''}, {formatBytes(policy.transferPolicy.maxTransferBytes, 0)} in total. Every file is checked for malware before it can be sent.
             </p>
           )}
         </section>

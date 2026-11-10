@@ -44,7 +44,7 @@ export function NotificationsPage() {
   return (
     <>
       <div className="page-head">
-        <div><h1>Notifications</h1><p>In-app notices and your default email preferences.</p></div>
+        <div><h1>Notifications</h1><p>What has happened on your transfers, and what you want emailing about.</p></div>
         <button className="btn" onClick={() => markAll.mutate()} disabled={!q.data?.unread}>Mark all as read</button>
       </div>
       <div className="two-col">

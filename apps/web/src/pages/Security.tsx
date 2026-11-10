@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { startRegistration } from '@simplewebauthn/browser';
+import type { startRegistration } from '@simplewebauthn/browser';
+import { TotpSetup } from '../components/Qr';
 import { get, post, del, errorMessage } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { fmt } from '../lib/time';
@@ -41,7 +42,7 @@ export function SecurityPage() {
   const addPasskey = () =>
     run(async () => {
       const optionsJSON = await post<Parameters<typeof startRegistration>[0]['optionsJSON']>('/api/auth/enrol/passkey/options');
-      const response = await startRegistration({ optionsJSON });
+      const response = await (await import('@simplewebauthn/browser')).startRegistration({ optionsJSON });
       const r = await post<{ recoveryCodes: string[] | null }>('/api/auth/enrol/passkey/verify', { response, label: label || 'Passkey' });
       if (r.recoveryCodes) setCodes(r.recoveryCodes);
       setLabel('');
@@ -65,7 +66,7 @@ export function SecurityPage() {
   };
   return (
     <>
-      <div className="page-head"><div><h1>Account security</h1><p>{user.email} · {user.authKind === 'sso' ? 'Single sign-on account' : 'Local account'}</p></div></div>
+      <div className="page-head"><div><h1>Account &amp; security</h1><p>{user.email} · {user.authKind === 'sso' ? 'Single sign-on account' : 'Local account'}</p></div></div>
       {msg && <div className={`notice notice-${msg.tone}`} role={msg.tone === 'err' ? 'alert' : 'status'}>{msg.text}</div>}
       <div className="two-col">
         <div>
@@ -97,9 +98,8 @@ export function SecurityPage() {
                 <div className="row-between"><span>Enabled</span><button className="btn btn-sm btn-danger" onClick={() => void run(() => del('/api/auth/totp').then(() => undefined), 'Authenticator app removed.')}>Remove</button></div>
               ) : totp ? (
                 <form onSubmit={confirmTotp}>
-                  <p className="small">Add the key to your app, then enter the code.</p>
-                  <p><a href={totp.otpauthUrl} className="small">Add to authenticator app</a></p>
-                  <p className="mono" style={{ overflowWrap: 'anywhere' }}>{totp.secretBase32.match(/.{1,4}/g)?.join(' ')}</p>
+                  <p className="small">Scan this with your authenticator app, then enter the code it shows.</p>
+                  <TotpSetup otpauthUrl={totp.otpauthUrl} secretBase32={totp.secretBase32} />
                   <div className="field"><label htmlFor="tc">6-digit code</label><input id="tc" className="input code-input" inputMode="numeric" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))} /></div>
                   <button className="btn btn-primary" disabled={totpCode.length !== 6}>Confirm</button>
                 </form>

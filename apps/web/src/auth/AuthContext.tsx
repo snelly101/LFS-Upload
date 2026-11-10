@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { get, post, ApiError } from '../api';
 import type { AuthOptions, MeResponse } from '../lib/types';
 import { setTimeZone } from '../lib/time';
+import { applyBrand } from '../lib/theme';
 import { StepUpDialog } from '../components/StepUpDialog';
 
 interface AuthValue {
@@ -29,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const o = optQ.data;
     if (!o) return;
-    document.documentElement.style.setProperty('--accent', o.accentColour);
+    applyBrand({ theme: o.theme, colourScheme: o.colourScheme, accentColour: o.accentColour });
     document.title = o.productName;
   }, [optQ.data]);
 

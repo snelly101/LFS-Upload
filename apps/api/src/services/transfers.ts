@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { PoolClient } from 'pg';
 import type { AppContext } from '../context.js';
-import { badRequest, conflict, forbidden, notFound } from '../context.js';
+import { badRequest, conflict, forbidden, notFound, HttpError } from '../context.js';
 import type { Queryable } from '../db.js';
 import { audit, type AuditInput } from '../lib/audit.js';
 import { randomToken, sha256 } from '../lib/crypto.js';
@@ -557,40 +557,133 @@ export const ListQuerySchema = z.object({
 });
 
 export async function listTransfers(q: Queryable, scope: { senderId?: string }, query: z.infer<typeof ListQuerySchema>): Promise<{ items: TransferSummary[]; total: number }> {
-  const where: string[] = ['metadata_purged_at IS NULL'];
+  const where: string[] = ['t.metadata_purged_at IS NULL'];
   const params: unknown[] = [];
   if (scope.senderId) {
     params.push(scope.senderId);
-    where.push(`sender_id = $${params.length}`);
+    where.push(`t.sender_id = $${params.length}`);
   }
   if (query.q) {
-    params.push(`%${query.q.toLowerCase()}%`);
-    where.push(`(search_text LIKE $${params.length} OR EXISTS (SELECT 1 FROM recipient_grants g WHERE g.transfer_id = transfers.id AND g.email::text LIKE $${params.length}))`);
+    params.push(`%${query.q.toLowerCase().replace(/[\\%_]/g, (c) => '\\' + c)}%`);
+    where.push(`(t.search_text LIKE $${params.length} OR EXISTS (SELECT 1 FROM recipient_grants g WHERE g.transfer_id = t.id AND g.email::text LIKE $${params.length}))`);
   }
   switch (query.status) {
     case 'draft':
-      where.push(`status IN ('draft','uploading','scanning','ready')`);
+      where.push(`t.status IN ('draft','uploading','scanning','ready')`);
       break;
     case 'active':
-      where.push(`status = 'active' AND deletion_status = 'none'`);
+      where.push(`t.status = 'active' AND t.deletion_status = 'none'`);
       break;
     case 'expired':
-      where.push(`status = 'expired'`);
+      where.push(`t.status = 'expired'`);
       break;
     case 'revoked':
-      where.push(`status = 'revoked'`);
+      where.push(`t.status = 'revoked'`);
       break;
     case 'deleted':
-      where.push(`deletion_status = 'deleted'`);
+      where.push(`t.deletion_status = 'deleted'`);
       break;
   }
-  const w = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const total = (await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM transfers ${w}`, params)).rows[0]!.n;
+  const w = `WHERE ${where.join(' AND ')}`;
+  const total = (await q.query<{ n: number }>(`SELECT count(*)::int AS n FROM transfers t ${w}`, params)).rows[0]!.n;
   params.push(query.pageSize, (query.page - 1) * query.pageSize);
-  const rows = (await q.query<TransferRow>(`SELECT * FROM transfers ${w} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`, params)).rows;
-  const items: TransferSummary[] = [];
-  for (const t of rows) items.push(await summaryFor(q, t));
+  // One round trip for the page: recipients, completion counts and latest activity come from
+  // lateral subqueries instead of three extra queries per row.
+  const rows = (
+    await q.query<
+      TransferRow & {
+        recipients: { email: string; status: GrantView['status'] }[] | null;
+        recipients_completed: number | null;
+        downloads_completed: number | null;
+        last_at: Date | null;
+        last_type: string | null;
+      }
+    >(
+      `SELECT t.*, g.recipients, g.recipients_completed, d.downloads_completed, la.occurred_at AS last_at, la.event_type AS last_type
+         FROM transfers t
+         LEFT JOIN LATERAL (
+           SELECT jsonb_agg(jsonb_build_object('email', rg.email, 'status', rg.status) ORDER BY rg.created_at) AS recipients,
+                  (count(*) FILTER (WHERE rg.all_files_completed_at IS NOT NULL))::int AS recipients_completed
+             FROM recipient_grants rg WHERE rg.transfer_id = t.id) g ON true
+         LEFT JOIN LATERAL (
+           SELECT count(*)::int AS downloads_completed
+             FROM download_attempts da JOIN recipient_grants rg2 ON rg2.id = da.grant_id
+            WHERE rg2.transfer_id = t.id AND da.completed_at IS NOT NULL) d ON true
+         LEFT JOIN LATERAL (
+           SELECT occurred_at, event_type FROM audit_events ae WHERE ae.transfer_id = t.id ORDER BY ae.id DESC LIMIT 1) la ON true
+         ${w}
+        ORDER BY t.created_at DESC
+        LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    )
+  ).rows;
+  const items: TransferSummary[] = rows.map((t) => ({
+    id: t.id,
+    title: t.title,
+    status: t.status,
+    deletionStatus: t.deletion_status,
+    recipients: t.recipients ?? [],
+    fileCount: t.file_count,
+    totalBytes: t.total_bytes,
+    expiresAt: new Date(t.expires_at).toISOString(),
+    sentAt: iso(t.sent_at),
+    createdAt: new Date(t.created_at).toISOString(),
+    lastActivityAt: iso(t.last_at),
+    lastActivityType: t.last_type,
+    senderEmail: t.sender_email_at_event,
+    downloadsCompleted: t.downloads_completed ?? 0,
+    recipientsCompleted: t.recipients_completed ?? 0,
+  }));
   return { items, total };
+}
+
+/** A sender's own past recipients, most recently used first. Never crosses users. */
+export async function listContacts(q: Queryable, senderId: string, search: string): Promise<{ email: string; lastUsedAt: string; timesUsed: number }[]> {
+  const like = `%${search.trim().toLowerCase().replace(/[\\%_]/g, (c) => '\\' + c)}%`;
+  const r = await q.query<{ email: string; last: Date; n: number }>(
+    `SELECT g.email::text AS email, max(g.created_at) AS last, count(*)::int AS n
+       FROM recipient_grants g JOIN transfers t ON t.id = g.transfer_id
+      WHERE t.sender_id = $1 AND t.metadata_purged_at IS NULL AND g.email::text LIKE $2
+      GROUP BY g.email ORDER BY max(g.created_at) DESC LIMIT 8`,
+    [senderId, like],
+  );
+  return r.rows.map((c) => ({ email: c.email, lastUsedAt: c.last.toISOString(), timesUsed: c.n }));
+}
+
+const MAX_REMINDERS_PER_GRANT = 3;
+const REMINDER_COOLDOWN_MS = 60 * 60 * 1000;
+
+/**
+ * Sender-initiated reminder to one recipient who has not downloaded everything. Bounded (3 per
+ * recipient, at most one an hour) so it cannot be used to pester. Only token hashes are stored, so a
+ * reminder carries a fresh link and the previously emailed link stops working.
+ */
+export async function remindRecipient(ctx: AppContext, q: Queryable, user: { id: string; email: string; display_name: string }, transferId: string, grantId: string, a: ActorInfo) {
+  const t = await loadOwnedTransfer(q, transferId, user.id, true);
+  const now = ctx.clock.now();
+  if (!isAccessible(t, now)) throw conflict('This transfer is no longer active', 'not_active');
+  const g = (await q.query<{ id: string; email: string; status: string; all_files_completed_at: Date | null }>(`SELECT id, email, status, all_files_completed_at FROM recipient_grants WHERE id = $1 AND transfer_id = $2 FOR UPDATE`, [grantId, t.id])).rows[0];
+  if (!g) throw notFound('Recipient not found');
+  if (g.status !== 'invited') throw conflict('This recipient no longer has access', 'grant_inactive');
+  if (g.all_files_completed_at) throw conflict('This recipient has already downloaded everything', 'already_completed');
+  const prior = (await q.query<{ n: number; last: Date | null }>(`SELECT count(*)::int AS n, max(created_at) AS last FROM outbox_messages WHERE grant_id = $1 AND dedupe_key LIKE 'manual-remind:%'`, [g.id])).rows[0]!;
+  if (prior.n >= MAX_REMINDERS_PER_GRANT) throw conflict(`You have already sent ${MAX_REMINDERS_PER_GRANT} reminders to this recipient`, 'remind_limit');
+  if (prior.last && now.getTime() - new Date(prior.last).getTime() < REMINDER_COOLDOWN_MS) {
+    const mins = Math.ceil((REMINDER_COOLDOWN_MS - (now.getTime() - new Date(prior.last).getTime())) / 60_000);
+    throw new HttpError(429, `A reminder was sent recently. You can send another in ${mins} minute${mins === 1 ? '' : 's'}.`, 'cooldown');
+  }
+  const token = await issueGrantToken(q, g.id);
+  await queueEmail(q, {
+    kind: 'expiring_soon_recipient',
+    to: g.email,
+    transferId: t.id,
+    grantId: g.id,
+    data: { senderName: user.display_name || user.email, link: recipientLink(ctx, token), expiresAt: new Date(t.expires_at).toISOString() },
+    dedupeKey: `manual-remind:${g.id}:${prior.n + 1}`,
+  });
+  // created_at defaults to the database clock; align it with the injected clock so cooldowns are testable.
+  await q.query(`UPDATE outbox_messages SET created_at = $2 WHERE dedupe_key = $1`, [`manual-remind:${g.id}:${prior.n + 1}`, now]);
+  await audit(q, { ...a, eventType: 'invitation.reminder_sent', transferId: t.id, grantId: g.id, details: { attempt: prior.n + 1 } });
 }
 
 export async function transferActivity(q: Queryable, transferId: string, limit = 500) {

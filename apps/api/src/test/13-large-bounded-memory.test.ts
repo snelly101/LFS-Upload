@@ -9,6 +9,10 @@ const CHUNK = Number(process.env.LARGE_CHUNK_BYTES ?? 16 * 1024 * 1024);
 
 beforeAll(async () => {
   await h.start();
+  // The test clamd limit is 100 MiB; allow oversize registration explicitly (the fake scanner reports clean).
+  const ac = await h.login(await h.createUser('admin'));
+  const settings = await h.api('GET', '/api/admin/settings', undefined, ac);
+  await h.api('PUT', '/api/admin/settings/transferPolicy', { value: { ...settings.json.settings.transferPolicy, allowUnscannedOversizedRelease: true }, reason: 'large-file test' }, ac);
   cookie = await h.login(await h.createUser('sender'));
 });
 afterAll(() => h.stop());

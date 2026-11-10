@@ -45,6 +45,17 @@ async function main() {
         });
         break;
       }
+      case 'record-backup-verification': {
+        // Called by the monthly restore check (deploy/restore-check.sh) after a successful test restore.
+        const note = args.join(' ').slice(0, 500) || 'Automated restore check passed';
+        const s = await ctx.settings.get('storage');
+        await ctx.db.tx(async (c) => {
+          await ctx.settings.save(c, 'storage', { ...s, lastBackupVerifiedAt: ctx.clock.now().toISOString(), backupVerificationNote: note }, null);
+          await audit(c, { actorKind: 'system', eventType: 'admin.backup_verified', details: { note, source: 'cli' } });
+        });
+        console.log('Backup verification recorded.');
+        break;
+      }
       case 'seed': {
         if (ctx.config.isProd) throw new Error('Refusing to seed a production database');
         await seedDevelopment(ctx);
@@ -52,7 +63,7 @@ async function main() {
         break;
       }
       default:
-        console.log('usage: cli <migrate|bootstrap-admin <email> [--password pw]|seed>');
+        console.log('usage: cli <migrate|bootstrap-admin <email> [--password pw]|record-backup-verification <note>|seed>');
     }
   } finally {
     await ctx.db.close();

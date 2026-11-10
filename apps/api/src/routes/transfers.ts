@@ -122,6 +122,17 @@ export async function transferRoutes(app: FastifyInstance, ctx: AppContext) {
     return T.transferDetail(ctx, ctx.db, await T.loadOwnedTransfer(ctx.db, id, req.auth!.user.id));
   });
 
+  app.get('/api/contacts', sender, async (req) => {
+    const { q } = z.object({ q: z.string().max(100).default('') }).parse(req.query);
+    return { contacts: await T.listContacts(ctx.db, req.auth!.user.id, q) };
+  });
+
+  app.post('/api/transfers/:id/grants/:grantId/remind', sender, async (req) => {
+    const { id, grantId } = z.object({ id: z.string().uuid(), grantId: z.string().uuid() }).parse(req.params);
+    await ctx.db.tx((c) => T.remindRecipient(ctx, c, req.auth!.user, id, grantId, act(req)));
+    return { ok: true };
+  });
+
   app.post('/api/transfers/:id/grants/:grantId/resend', sender, async (req) => {
     const { id, grantId } = z.object({ id: z.string().uuid(), grantId: z.string().uuid() }).parse(req.params);
     await ctx.db.tx((c) => T.resendInvitation(ctx, c, req.auth!.user, id, grantId, act(req)));

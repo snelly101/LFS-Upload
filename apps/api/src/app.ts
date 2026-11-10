@@ -19,6 +19,7 @@ import { adminRoutes } from './routes/admin.js';
 import { auditRoutes } from './routes/audit.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { healthRoutes } from './routes/health.js';
+import { eventRoutes } from './routes/events.js';
 import { startAccessWatcher } from './services/accessWatcher.js';
 
 export interface BuildOptions {
@@ -121,6 +122,7 @@ export async function buildApp(ctx: AppContext, opts: BuildOptions = {}): Promis
   await auditRoutes(app, ctx);
   await notificationRoutes(app, ctx);
   await healthRoutes(app, ctx);
+  await eventRoutes(app, ctx);
 
   // Serve the built SPA (production). Recipient pages live under /r/... and are served the same bundle.
   if (opts.serveWeb && fs.existsSync(opts.serveWeb)) {

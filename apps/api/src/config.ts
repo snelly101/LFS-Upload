@@ -33,6 +33,8 @@ const schema = z.object({
   STREAM_RECHECK_MS: z.coerce.number().int().default(2000),
   COOKIE_SECURE: bool.optional(),
   DEV_SEED: bool.default(false),
+  /** Bearer token for GET /statusz (monitoring). Endpoint is disabled (404) when unset. */
+  MONITOR_TOKEN: z.string().min(24).optional().or(z.literal('').transform(() => undefined)),
 });
 
 export type Config = z.infer<typeof schema> & {

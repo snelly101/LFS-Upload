@@ -9,6 +9,8 @@ set -euo pipefail
 ADMIN_EMAIL="${1:-}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE"
+# shellcheck source=deploy/lib.sh
+. "$HERE/lib.sh"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Installing Docker Engine from the official repository..."
@@ -37,13 +39,19 @@ if [ ! -f .env ]; then
   cp .env.example .env
   sed -i "s|^SERVER_SECRET_KEY=.*|SERVER_SECRET_KEY=$(openssl rand -base64 48)|" .env
   sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=')|" .env
+  sed -i "s|^MONITOR_TOKEN=.*|MONITOR_TOKEN=$(openssl rand -hex 32)|" .env
   chmod 600 .env
   echo "Created $HERE/.env with generated secrets."
   echo "Next: edit PUBLIC_HOST, PUBLIC_URL, ACME_EMAIL and SMTP settings in $HERE/.env, then run:  bash $HERE/install.sh [admin-email]"
   exit 0
 fi
 
-docker compose build
+ensure_env_defaults
+if [ -n "$(env_get SECURESEND_IMAGE)" ]; then
+  docker compose pull api worker
+else
+  docker compose build
+fi
 # Wait for PostgreSQL's health check before migrating; clamav is started in parallel but not waited for
 # (its first signature download takes minutes and the API tolerates a scanner that is not yet ready).
 docker compose up -d clamav
@@ -58,3 +66,7 @@ echo "Check:  docker compose ps   and   curl -fsS https://$(grep ^PUBLIC_HOST= .
 if [ -z "$ADMIN_EMAIL" ]; then
   echo "Create the first administrator:  docker compose run --rm --no-deps api node dist/cli.js bootstrap-admin you@example.com"
 fi
+echo "Next, so the server looks after itself (docs/GO-LIVE.md):"
+echo "  sudo $HERE/harden-host.sh       # security updates, log limits, volume and clock checks"
+echo "  sudo $HERE/install-timers.sh    # nightly backup + monthly restore check"
+echo "  sudo $HERE/monitor-check.sh     # one-line health summary for NinjaOne"

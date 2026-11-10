@@ -1,0 +1,12 @@
+[Unit]
+Description=Secure File Send: monthly restore check
+
+[Timer]
+# First day of each month, after the nightly backup window.
+OnCalendar=*-*-01 04:10:00
+RandomizedDelaySec=30min
+Persistent=true
+Unit=securesend-restore-check.service
+
+[Install]
+WantedBy=timers.target

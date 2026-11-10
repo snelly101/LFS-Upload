@@ -1,0 +1,20 @@
+# Installed by deploy/install-timers.sh (@DEPLOY_DIR@ is replaced with the real path).
+[Unit]
+Description=Secure File Send: nightly database backup (content volume excluded by design)
+Documentation=file://@DEPLOY_DIR@/../docs/RUNBOOK-BACKUP-RESTORE.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=@DEPLOY_DIR@
+ExecStart=@DEPLOY_DIR@/backup.sh
+User=root
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=2h
+# The dump may contain personal data: never let a crash write it into a core file.
+LimitCORE=0

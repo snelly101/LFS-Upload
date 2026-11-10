@@ -1,0 +1,12 @@
+[Unit]
+Description=Secure File Send: nightly database backup
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+RandomizedDelaySec=20min
+# Run at next boot if the server was off at the scheduled time.
+Persistent=true
+Unit=securesend-backup.service
+
+[Install]
+WantedBy=timers.target

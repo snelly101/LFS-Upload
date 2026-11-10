@@ -1,0 +1,158 @@
+# Checks every change, and publishes the application image so the production server pulls a
+# finished image instead of compiling in the DMZ (deploy/upgrade.sh with SECURESEND_IMAGE set).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, "feat/**"]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish_image:
+        description: "Also build and push the image from this ref"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Typecheck, build and integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: securesend
+          POSTGRES_PASSWORD: securesend_ci
+          POSTGRES_DB: securesend_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U securesend -d securesend_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      # Actions are pinned by major version; Dependabot (.github/dependabot.yml) proposes updates.
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version comes from "packageManager" in package.json (pnpm 10.28.0)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @securesend/shared run build
+
+      - name: Typecheck (api, web, e2e)
+        run: |
+          pnpm --filter @securesend/api run typecheck
+          pnpm --filter @securesend/web run typecheck
+          pnpm --filter @securesend/e2e exec tsc -p tsconfig.json --noEmit
+
+      - name: Build web bundle
+        run: pnpm --filter @securesend/web run build
+
+      # A real clamd with an EICAR-only signature set, exactly as scripts/dev-up.sh does locally:
+      # the scanner client is tested against the real daemon without downloading the full database.
+      - name: Start clamd (EICAR-only signatures)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clamav-daemon
+          sudo systemctl stop clamav-daemon clamav-freshclam 2>/dev/null || true
+          CLAM="$RUNNER_TEMP/clamtest"
+          mkdir -p "$CLAM/db" "$CLAM/run"
+          printf 'Eicar-Test-Signature:0:*:58354f2150254041505b345c505a58353428505e2937434329377d2445494341522d5354414e444152442d414e544956495255532d544553542d46494c452124482b482a\n' > "$CLAM/db/eicar.ndb"
+          cat > "$CLAM/clamd.conf" <<CONF
+          LogFile $CLAM/clamd.log
+          PidFile $CLAM/run/clamd.pid
+          DatabaseDirectory $CLAM/db
+          TCPSocket 3310
+          TCPAddr 127.0.0.1
+          Foreground no
+          StreamMaxLength 100M
+          MaxFileSize 100M
+          MaxScanSize 100M
+          AlertExceedsMax yes
+          CONF
+          sed -i 's/^ *//' "$CLAM/clamd.conf"
+          clamd --config-file="$CLAM/clamd.conf"
+          for i in $(seq 1 30); do
+            if (exec 3<>/dev/tcp/127.0.0.1/3310) 2>/dev/null; then echo "clamd is listening"; exit 0; fi
+            sleep 1
+          done
+          echo "clamd did not start"; cat "$CLAM/clamd.log" || true; exit 1
+
+      - name: Write test environment (apps/api/.env.test is not committed)
+        run: |
+          mkdir -p "$RUNNER_TEMP/content-test"
+          cat > apps/api/.env.test <<ENV
+          NODE_ENV=test
+          PUBLIC_URL=http://localhost:3999
+          DATABASE_URL=postgres://securesend:securesend_ci@127.0.0.1:5432/securesend_test
+          SERVER_SECRET_KEY=$(openssl rand -base64 48)
+          CONTENT_ROOT=$RUNNER_TEMP/content-test
+          CLAMD_HOST=127.0.0.1
+          CLAMD_PORT=3310
+          CLAMD_MAX_STREAM_BYTES=104857600
+          MAIL_TRANSPORT=memory
+          LOG_LEVEL=warn
+          ENV
+          sed -i 's/^ *//' apps/api/.env.test
+
+      - name: Integration tests (PostgreSQL + clamd)
+        run: pnpm --filter @securesend/api run test
+
+      - name: Dependency audit (production dependencies; informational)
+        continue-on-error: true
+        run: pnpm audit --prod --audit-level high
+
+  image:
+    name: Build and publish image
+    needs: test
+    if: >-
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')))
+      || (github.event_name == 'workflow_dispatch' && inputs.publish_image)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/snelly101/lfs-upload
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

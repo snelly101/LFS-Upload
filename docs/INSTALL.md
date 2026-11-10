@@ -88,9 +88,12 @@ blocks. Disable automatic snapshots for the content disk, or accept and document
 retention defeats the deletion guarantee for its lifetime (docs/THREAT-MODEL.md, "Residual risks").
 
 ### 1.3 Firewall
-```bash
-ufw default deny incoming; ufw allow 22/tcp; ufw allow 80/tcp; ufw allow 443/tcp; ufw allow 443/udp; ufw enable
-```
+The minimized Ubuntu image has no local firewall and the deployment does not add one: Docker publishes
+only ports 80 and 443 (Caddy), and SSH is the only other listener. Filter at the network edge:
+
+* inbound from the internet: TCP 80 and 443 (and UDP 443 for HTTP/3) to the server;
+* inbound TCP 22 only from your management subnet;
+* outbound: the list in docs/GO-LIVE.md §1.
 
 ## 2. Install
 
@@ -100,6 +103,9 @@ sudo deploy/install.sh                    # first run: installs Docker, creates 
 sudo nano deploy/.env                     # set PUBLIC_HOST, PUBLIC_URL, ACME_EMAIL, SMTP_URL/SMTP_FROM
 sudo deploy/install.sh admin@example.com  # builds, migrates, starts, prints a one-time admin invitation link
 ```
+
+If you publish images from CI, set `SECURESEND_IMAGE` in `deploy/.env` before the second run and the
+installer pulls the image instead of building it (docs/UPGRADE.md).
 
 The invitation link is printed once and expires in 24 hours. Opening it sets the password, then the
 browser immediately requires MFA enrolment (passkey or authenticator app) before any administration is
@@ -140,5 +146,15 @@ docker compose -f deploy/docker-compose.yml logs worker | tail             # "wo
 ```
 Then in the UI: Administration → System health (scanner OK, worker alive, disk, SMTP test), send a
 test transfer to yourself, verify the code, download, revoke, and confirm "deleted" within the target.
-Record the result in Administration → Storage & deletion → "Backup verified" after a restore drill
-(docs/RUNBOOK-BACKUP-RESTORE.md).
+## 5. Make the server look after itself
+
+```bash
+sudo deploy/harden-host.sh       # security updates (no auto-reboot), log limits, swap/core-dump/clock/LUKS checks
+sudo deploy/install-timers.sh    # nightly encrypted backup + monthly restore check
+sudo deploy/monitor-check.sh     # one-line health summary; schedule it from your RMM
+```
+
+Set `BACKUP_AGE_RECIPIENT` in `deploy/.env` first so backups are encrypted
+(docs/RUNBOOK-BACKUP-RESTORE.md). `harden-host.sh` exits non-zero and says why if swap is unencrypted,
+the clock is not synchronised, or a volume is not on a LUKS device. It does not touch SSH or any firewall.
+The full path from this point to a public service is docs/GO-LIVE.md.

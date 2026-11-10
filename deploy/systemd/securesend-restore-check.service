@@ -1,0 +1,17 @@
+# Installed by deploy/install-timers.sh (@DEPLOY_DIR@ is replaced with the real path).
+[Unit]
+Description=Secure File Send: monthly restore check of the newest database backup
+Documentation=file://@DEPLOY_DIR@/../docs/RUNBOOK-BACKUP-RESTORE.md
+Requires=docker.service
+After=docker.service network-online.target securesend-backup.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=@DEPLOY_DIR@
+ExecStart=@DEPLOY_DIR@/restore-check.sh
+User=root
+UMask=0077
+Nice=10
+TimeoutStartSec=1h
+LimitCORE=0

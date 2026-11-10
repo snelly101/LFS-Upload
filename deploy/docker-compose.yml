@@ -1,6 +1,6 @@
 # Together Housing Secure File Send – single-host deployment.
 # Only caddy publishes ports (80/443). Everything else lives on private networks; the database has no route out.
-# Images are pinned by tag; see docs/UPGRADE.md for the update procedure.
+# Third-party images are pinned by tag; see docs/UPGRADE.md for the update procedure.
 # The Docker socket is never mounted into any container.
 
 name: securesend
@@ -12,7 +12,11 @@ x-app-common: &app-common
     # Build steps use the host network: in DMZ/firewalled hosts the BuildKit bridge sometimes cannot
     # reach the npm registry even when ordinary containers can. Runtime services are unaffected.
     network: host
-  image: securesend:local
+  # Default: the image built on this host. Set SECURESEND_IMAGE in deploy/.env to a published image
+  # (for example ghcr.io/snelly101/lfs-upload:1.2.0) and deploy/upgrade.sh pulls it instead of building.
+  image: ${SECURESEND_IMAGE:-securesend:local}
+  # env_file passes every variable in deploy/.env to api and worker, including MONITOR_TOKEN, which
+  # the api uses to authorise GET /statusz for deploy/monitor-check.sh (unset = endpoint returns 404).
   env_file: .env
   environment:
     NODE_ENV: production

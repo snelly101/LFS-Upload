@@ -1,0 +1,5 @@
+# Local state written by upgrade.sh / rollback.sh; never committed.
+.last-image
+.last-commit
+.deployed-commit
+.image-before-rollback

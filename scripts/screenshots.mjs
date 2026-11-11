@@ -118,6 +118,61 @@ await dead.waitForSelector("text=This link isn't recognised");
 await shot('recipient-dead-link.png', dead);
 await dead.close();
 
+// ---------------------------------------------------------------- file request (staff asks, contributor sends)
+await page.goto(`${BASE}/request`);
+await page.waitForSelector('text=Ask someone to send you files');
+await page.fill('#req-from', 'jo.tenant@example.invalid');
+await page.keyboard.press('Enter');
+await page.fill('#req-title', 'Signed tenancy agreement and proof of address');
+await page.click('button:has-text("Add a note")');
+await page.fill('#req-note', 'Photos from your phone are fine. Please include every page of the agreement.');
+await page.click('#req-title');
+await shot('request-compose.png', page);
+const askedAt = Date.now();
+await page.click('button:has-text("Send request to")');
+await page.waitForSelector('text=Request sent to Jo');
+await shot('request-sent.png', page);
+const requestUrl = new URL(await page.getAttribute('a:has-text("Track it")', 'href'), BASE).toString();
+
+const askMail = await waitMail((t) => t.includes('jo.tenant@example.invalid') && t.includes('asked you to send files'), askedAt);
+const askLink = askMail.match(/http:\/\/localhost:3000\/r\/[A-Za-z0-9_-]+/)[0].replace('http://localhost:3000', BASE);
+const cctx = await browser.newContext({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true });
+const cp = await cctx.newPage();
+watch(cp, 'contributor');
+await cp.goto(askLink);
+await cp.waitForSelector('text=You have been asked to send files');
+await shot('request-verify-mobile.png', cp);
+const askCodeAt = Date.now();
+await cp.click('text=Email me a code');
+await cp.waitForSelector('#code');
+const askCode = await waitMail((t) => t.includes('jo.tenant@example.invalid') && t.includes('verification code'), askCodeAt);
+await cp.fill('#code', askCode.match(/code is: (\d{6})/)[1]);
+await cp.click('button:has-text("Continue")');
+await cp.waitForSelector('text=Choose files');
+const overflow360 = await cp.evaluate(() => document.documentElement.scrollWidth);
+if (overflow360 > 360) errors.push(`[contributor] page is ${overflow360}px wide at 360px`);
+// Slow the connection so the "uploading" state can be captured honestly, then let it finish.
+const cdp = await cctx.newCDPSession(cp);
+await cdp.send('Network.enable');
+await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 20, downloadThroughput: -1, uploadThroughput: 900 * 1024 });
+const up1 = '/tmp/tenancy-agreement-signed.pdf';
+fs.writeFileSync(up1, Buffer.alloc(9 * 1024 * 1024 + 321, 5));
+const up2 = '/tmp/proof-of-address.jpg';
+fs.writeFileSync(up2, Buffer.alloc(640 * 1024, 7));
+await cp.setInputFiles('input[type=file]', [up2, up1]);
+await cp.waitForFunction(() => /Uploading · [1-9]\d?%/.test(document.body.innerText) && document.body.innerText.includes('Received'), null, { timeout: 60_000 });
+await shot('request-upload-mobile.png', cp);
+await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+await cp.waitForSelector('text=You can close this page', { timeout: 120_000 });
+await shot('request-received-mobile.png', cp);
+await cctx.close();
+
+await page.goto(requestUrl);
+await page.waitForSelector('.files-in a:has-text("Download")');
+await page.waitForFunction(() => document.querySelectorAll('.files-in a').length === 2, null, { timeout: 30_000 });
+await page.waitForTimeout(600);
+await shot('request-detail.png', page);
+
 // ---------------------------------------------------------------- sender sees progress
 await page.goto(transferUrl);
 await page.waitForFunction(() => document.body.innerText.includes('Opened'), null, { timeout: 30_000 });

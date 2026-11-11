@@ -57,6 +57,10 @@ export interface TransferSummary {
   id: string;
   /** 'inbound' = a file request: named external people send files to the owner. */
   direction: TransferDirection;
+  /** Inbound only: files that have arrived and passed the scan. */
+  filesReceived?: number;
+  /** Inbound only: when the request stopped accepting uploads. */
+  closedAt?: string | null;
   title: string;
   status: TransferStatus;
   deletionStatus: DeletionStatus;

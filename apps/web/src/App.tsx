@@ -16,6 +16,7 @@ const ActivityPage = lazy(() => import('./pages/Activity').then((m) => ({ defaul
 const NotificationsPage = lazy(() => import('./pages/Notifications').then((m) => ({ default: m.NotificationsPage })));
 const SecurityPage = lazy(() => import('./pages/Security').then((m) => ({ default: m.SecurityPage })));
 const AdminArea = lazy(() => import('./pages/admin/AdminArea'));
+const RequestPage = lazy(() => import('./pages/Request'));
 
 const Loading = () => <div className="loading" role="status">Loading…</div>;
 
@@ -48,6 +49,7 @@ export function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route element={<Shell />}>
             <Route index element={<HomeForRole />} />
+            <Route path="/request" element={<RequestPage />} />
             <Route path="/sent" element={<SentPage />} />
             <Route path="/sent/:id" element={<TransferDetailPage />} />
             <Route path="/transfers" element={<Navigate to="/sent" replace />} />

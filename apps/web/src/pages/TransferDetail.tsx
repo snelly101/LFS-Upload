@@ -10,6 +10,7 @@ import { Steps, headline } from '../components/Steps';
 import { fmt, fmtLong, countdown, toLocalInput, fromLocalInput } from '../lib/time';
 import { refCode } from '../lib/labels';
 import { usePollInterval } from '../lib/live';
+import { RequestDetail } from './RequestDetail';
 
 export { prefLabel } from '../lib/labels';
 
@@ -53,6 +54,7 @@ export function TransferDetailPage() {
   if (t.isLoading) return <p>Loading…</p>;
   if (t.isError || !t.data) return <div className="notice notice-err">We couldn't find that transfer.</div>;
   const d = t.data;
+  if (d.direction === 'inbound') return <RequestDetail d={d} />;
   const state = transferState(d);
   const isUnsent = ['draft', 'uploading', 'scanning', 'ready'].includes(d.status);
   const isLive = d.status === 'active' && d.deletionStatus === 'none' && new Date(d.expiresAt).getTime() > Date.now();

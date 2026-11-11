@@ -48,7 +48,7 @@ const SANS = "'Segoe UI',Helvetica,Arial,sans-serif";
  * images or web fonts, and a small dark-mode block for clients that honour it. The organisation's
  * name leads; the service name sits beneath it.
  */
-function layout(ctx: TemplateContext, title: string, bodyHtml: string, footerNote?: string): string {
+export function layout(ctx: TemplateContext, title: string, bodyHtml: string, footerNote?: string): string {
   const { org, name } = lockup(ctx);
   const accent = /^#[0-9a-f]{6}$/i.test(ctx.accentColour) ? ctx.accentColour : '#11665C';
   return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>${esc(title)}</title>
@@ -76,7 +76,7 @@ ${org ? `<div class="ss-org" style="font-family:${SANS};font-size:11px;line-heig
 }
 
 /** A real button (table cell, so Outlook draws it) followed by the plain link for anyone who cannot click it. */
-function button(ctx: TemplateContext, href: string, label: string): string {
+export function button(ctx: TemplateContext, href: string, label: string): string {
   const accent = /^#[0-9a-f]{6}$/i.test(ctx.accentColour) ? ctx.accentColour : '#11665C';
   const fg = onAccent(accent);
   return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:22px 0 18px;"><tr><td bgcolor="${esc(accent)}" style="background:${esc(accent)};border-radius:3px;"><a href="${esc(href)}" style="display:inline-block;padding:13px 24px;font-family:${SANS};font-size:16px;line-height:20px;font-weight:bold;color:${fg};text-decoration:none;">${esc(label)}</a></td></tr></table>

@@ -583,6 +583,7 @@ async function summaryFor(q: Queryable, t: TransferRow): Promise<TransferSummary
 export const ListQuerySchema = z.object({
   q: z.string().max(200).optional(),
   status: z.enum(['all', 'draft', 'active', 'expired', 'revoked', 'deleted']).default('all'),
+  direction: z.enum(['all', 'outbound', 'inbound']).default('all'),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
@@ -597,6 +598,10 @@ export async function listTransfers(q: Queryable, scope: { senderId?: string }, 
   if (query.q) {
     params.push(`%${query.q.toLowerCase().replace(/[\\%_]/g, (c) => '\\' + c)}%`);
     where.push(`(t.search_text LIKE $${params.length} OR EXISTS (SELECT 1 FROM recipient_grants g WHERE g.transfer_id = t.id AND g.email::text LIKE $${params.length}))`);
+  }
+  if (query.direction !== 'all') {
+    params.push(query.direction);
+    where.push(`t.direction = $${params.length}::transfer_direction`);
   }
   switch (query.status) {
     case 'draft':
@@ -628,9 +633,11 @@ export async function listTransfers(q: Queryable, scope: { senderId?: string }, 
         downloads_completed: number | null;
         last_at: Date | null;
         last_type: string | null;
+        files_received: number | null;
       }
     >(
-      `SELECT t.*, g.recipients, g.recipients_completed, d.downloads_completed, la.occurred_at AS last_at, la.event_type AS last_type
+      `SELECT t.*, g.recipients, g.recipients_completed, d.downloads_completed, la.occurred_at AS last_at, la.event_type AS last_type,
+              (SELECT count(*)::int FROM transfer_files rf WHERE rf.transfer_id = t.id AND rf.storage_state = 'released' AND t.direction = 'inbound') AS files_received
          FROM transfers t
          LEFT JOIN LATERAL (
            SELECT jsonb_agg(jsonb_build_object('email', rg.email, 'status', rg.status) ORDER BY rg.created_at) AS recipients,
@@ -665,6 +672,7 @@ export async function listTransfers(q: Queryable, scope: { senderId?: string }, 
     senderEmail: t.sender_email_at_event,
     downloadsCompleted: t.downloads_completed ?? 0,
     recipientsCompleted: t.recipients_completed ?? 0,
+    ...(t.direction === 'inbound' ? { filesReceived: t.files_received ?? 0, closedAt: iso(t.closed_at) } : {}),
   }));
   return { items, total };
 }

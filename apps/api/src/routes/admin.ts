@@ -304,6 +304,6 @@ export async function adminRoutes(app: FastifyInstance, ctx: AppContext) {
     // Operational metadata only: no content access.
     const q = z.object({ q: z.string().max(200).optional(), page: z.coerce.number().int().min(1).default(1) }).parse(req.query);
     const { listTransfers } = await import('../services/transfers.js');
-    return listTransfers(ctx.db, {}, { q: q.q, status: 'all', page: q.page, pageSize: 25 });
+    return listTransfers(ctx.db, {}, { q: q.q, status: 'all', direction: 'all', page: q.page, pageSize: 25 });
   });
 }

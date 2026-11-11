@@ -1,6 +1,11 @@
 /** Human labels for audit event types. Wording is deliberately precise (see brief §8). */
 const LABELS: Record<string, string> = {
   'transfer.created': 'Transfer created',
+  'request.created': 'File request created',
+  'request.closed': 'Request closed to new files',
+  'inbound.file_registered': 'Contributor started sending a file',
+  'inbound.downloaded_by_owner': 'Requester downloaded a received file',
+  'invitation.reminder_sent': 'Reminder sent (new link)',
   'transfer.updated': 'Transfer details updated',
   'transfer.recipients_set': 'Recipient list set',
   'transfer.sent': 'Invitations sent',

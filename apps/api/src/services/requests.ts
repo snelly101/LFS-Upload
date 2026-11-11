@@ -3,6 +3,7 @@ import type { AppContext } from '../context.js';
 import { HttpError, badRequest, conflict, forbidden, notFound } from '../context.js';
 import type { Queryable } from '../db.js';
 import { audit } from '../lib/audit.js';
+import { enqueue } from '../lib/jobs.js';
 import { randomToken, sha256 } from '../lib/crypto.js';
 import { computeEffectivePolicy } from '../lib/settings.js';
 import type { RecipientInboundView } from '@securesend/shared';
@@ -93,6 +94,21 @@ export async function addInboundFile(ctx: AppContext, q: Queryable, l: NonNullab
   const f = await T.registerFileRow(ctx, q, t, owner, l.grant.id, input);
   await audit(q, { actorKind: 'recipient', actorEmail: s.verified_email, actorSessionId: s.id, transferId: t.id, grantId: l.grant.id, fileId: f.id, eventType: 'inbound.file_registered', details: { displayName: f.display_name, sizeBytes: input.sizeBytes }, ...a });
   return f;
+}
+
+/** A contributor withdraws one of their own uploads that has not finished. Finished files cannot be recalled by the contributor. */
+export async function withdrawInboundFile(ctx: AppContext, q: Queryable, l: NonNullable<GrantLookup>, s: RecipientSessionRow, fileId: string, a: { correlationId?: string | null; ipPrefix?: string | null; userAgent?: string | null }) {
+  await q.query(`SELECT id FROM transfers WHERE id = $1 FOR UPDATE`, [l.transfer.id]);
+  const f = (await q.query<{ id: string; size_bytes: number; upload_status: string }>(`SELECT id, size_bytes, upload_status::text FROM transfer_files WHERE id = $1 AND transfer_id = $2 AND uploaded_by_grant_id = $3 FOR UPDATE`, [fileId, l.transfer.id, l.grant.id])).rows[0];
+  if (!f) throw notFound('File not found');
+  if (f.upload_status === 'abandoned') return;
+  if (f.upload_status === 'finalised') throw conflict('This file has already been sent and cannot be withdrawn here', 'already_sent');
+  await q.query(`UPDATE transfer_files SET upload_status = 'abandoned' WHERE id = $1`, [f.id]);
+  await q.query(`UPDATE storage_reservations SET bytes = 0 WHERE file_id = $1`, [f.id]);
+  await q.query(`UPDATE transfers SET file_count = file_count - 1, total_bytes = total_bytes - $2 WHERE id = $1`, [l.transfer.id, f.size_bytes]);
+  // Partial bytes are cleaned up by the same job that handles abandoned staff uploads.
+  await enqueue(q, 'delete_transfer', { transferId: l.transfer.id, fileId: f.id, mode: 'file' }, { idempotencyKey: `delete-file:${f.id}`, priority: 20 });
+  await audit(q, { actorKind: 'recipient', actorEmail: s.verified_email, actorSessionId: s.id, transferId: l.transfer.id, grantId: l.grant.id, fileId: f.id, eventType: 'upload.abandoned', details: { inbound: true, reason: 'withdrawn by contributor' }, ...a });
 }
 
 function uploadState(f: { upload_status: string; scan_status: string; storage_state: string }): RecipientInboundView['uploads'][number]['state'] {

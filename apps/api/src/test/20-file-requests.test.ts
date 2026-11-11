@@ -182,6 +182,59 @@ describe('20. file requests: named, verified contributors send files in; only th
     expect((await h.db.query<{ storage_state: string }>(`SELECT storage_state::text FROM transfer_files WHERE id = $1`, [up.fileId])).rows[0]!.storage_state).toBe('deleted');
   });
 
+  it('lists filter by direction and show received counts; a contributor can withdraw an unfinished upload; the owner gets live events', async () => {
+    const owner = await h.login(await h.createUser('sender'));
+    const rq = await makeRequest(owner, ['w1@example.invalid', 'w2@example.invalid'], 'Photos of the repair');
+    await h.sendTransfer(owner, { title: 'Outbound one', recipients: ['o@example.invalid'] });
+    const token = rq.tokens['w1@example.invalid']!;
+    const v = await h.verifyRecipient(token);
+    // live events: open the owner's stream, then let a contributor upload
+    const ac = new AbortController();
+    const res = await h.raw('/api/events', { cookie: owner, signal: ac.signal });
+    const reader = res.body!.getReader();
+    let buf = '';
+    const dec = new TextDecoder();
+    const pump = (async () => {
+      try {
+        let step = await reader.read();
+        while (!step.done) {
+          buf += dec.decode(step.value, { stream: true });
+          step = await reader.read();
+        }
+      } catch {
+        /* aborted */
+      }
+    })();
+    await new Promise((r) => setTimeout(r, 150));
+    await contribute(token, v.cookie, 'before.jpg', Buffer.from('jpeg-ish'));
+    await h.worker.drain();
+    for (let i = 0; i < 40 && !buf.includes(rq.id); i++) await new Promise((r) => setTimeout(r, 50));
+    ac.abort();
+    await pump;
+    expect(buf).toContain(rq.id);
+    // a registered-but-unfinished upload can be withdrawn by its contributor only
+    const pending = await h.api('POST', `/api/r/${token}/uploads`, { name: 'never-sent.jpg', sizeBytes: 100 }, v.cookie);
+    expect(pending.status).toBe(201);
+    const t2 = rq.tokens['w2@example.invalid']!;
+    const v2 = await h.verifyRecipient(t2);
+    expect((await h.api('POST', `/api/r/${t2}/uploads/${pending.json.file.id}/withdraw`, {}, v2.cookie)).status).toBe(404);
+    expect((await h.api('POST', `/api/r/${token}/uploads/${pending.json.file.id}/withdraw`, {}, v.cookie)).status).toBe(200);
+    const view = await h.api('GET', `/api/r/${token}/view`, undefined, v.cookie);
+    expect(view.json.uploads.map((u: { name: string }) => u.name)).toEqual(['before.jpg']);
+    // a finished file cannot be withdrawn by the contributor
+    expect((await h.api('POST', `/api/r/${token}/uploads/${view.json.uploads[0].id}/withdraw`, {}, v.cookie)).status).toBe(409);
+    // list filter and counts
+    const inbound = await h.api('GET', '/api/transfers?direction=inbound', undefined, owner);
+    expect(inbound.json.total).toBe(1);
+    expect(inbound.json.items[0].direction).toBe('inbound');
+    expect(inbound.json.items[0].filesReceived).toBe(1);
+    expect(inbound.json.items[0].closedAt).toBeNull();
+    expect((await h.api('GET', '/api/transfers?direction=outbound', undefined, owner)).json.total).toBe(1);
+    expect((await h.api('GET', '/api/transfers', undefined, owner)).json.total).toBe(2);
+    await h.api('POST', `/api/transfers/${rq.id}/close`, {}, owner);
+    expect((await h.api('GET', '/api/transfers?direction=inbound', undefined, owner)).json.items[0].closedAt).toBeTruthy();
+  });
+
   it('an administrator can turn file requests off', async () => {
     const adminNow = await h.login(await h.createUser('admin'));
     const senderNow = await h.login(await h.createUser('sender'));

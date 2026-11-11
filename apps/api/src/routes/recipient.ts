@@ -119,6 +119,15 @@ export async function recipientRoutes(app: FastifyInstance, ctx: AppContext) {
   });
 
   const fileParams = z.object({ token: z.string().min(40).max(50), fileId: z.string().uuid() });
+
+  /** Contributor withdraws one of their own unfinished uploads. */
+  app.post('/api/r/:token/uploads/:fileId/withdraw', limitLight, async (req) => {
+    const { token, fileId } = fileParams.parse(req.params);
+    const { l, s } = await requireSession(req, token);
+    if (l.transfer.direction !== 'inbound') throw notFound();
+    await ctx.db.tx((c) => Q.withdrawInboundFile(ctx, c, l, s, fileId, actorFor(req)));
+    return { ok: true };
+  });
   const fileHandler = async (req: FastifyRequest, reply: Parameters<typeof streamFile>[2]) => {
     const { token, fileId } = fileParams.parse(req.params);
     const { l, s } = await requireSession(req, token);

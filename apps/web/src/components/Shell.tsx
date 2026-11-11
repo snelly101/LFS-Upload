@@ -18,6 +18,8 @@ export function Shell() {
   useLiveEvents(qc, signedIn);
   const poll = usePollInterval(60_000);
   const notif = useQuery({ queryKey: ['notifications'], queryFn: () => get<{ unread: number }>('/api/notifications'), enabled: signedIn, refetchInterval: poll });
+  // The "Request" destination only exists while the administrator allows file requests.
+  const policy = useQuery({ queryKey: ['transfer-policy'], queryFn: () => get<{ transferPolicy: { allowFileRequests?: boolean } }>('/api/transfers/policy'), enabled: signedIn && me?.user?.role !== 'auditor', staleTime: 60_000 });
   if (loading) return <div className="loading" role="status">Loading…</div>;
   if (!me?.user) return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname)}`} replace />;
   if (me.user.authLevel !== 'full') return <Navigate to="/login" replace />;
@@ -36,6 +38,7 @@ export function Shell() {
         </NavLink>
         <nav className="strip-nav" aria-label="Main">
           {canSend && <NavLink to="/" end>Send</NavLink>}
+          {canSend && policy.data?.transferPolicy.allowFileRequests !== false && policy.data && <NavLink to="/request">Request</NavLink>}
           {canSend && <NavLink to="/sent">Sent</NavLink>}
           {!canSend && <NavLink to="/activity">Activity</NavLink>}
           {user.role === 'admin' && <NavLink to="/admin" aria-current={isAdminArea ? 'page' : undefined}>Admin</NavLink>}

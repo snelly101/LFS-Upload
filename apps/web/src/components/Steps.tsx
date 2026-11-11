@@ -58,3 +58,55 @@ export function headline(t: { status: string; deletionStatus: string; expiresAt:
   if (opened.length > 0) return active.length === 1 ? `${name(opened[0]!)} opened it but hasn't downloaded yet.` : `${opened.length} of ${active.length} recipients have opened it; none has downloaded everything yet.`;
   return active.length === 1 ? `Waiting for ${name(active[0]!)} to open it.` : `Waiting for recipients to open it.`;
 }
+
+/** Three-step strip for one contributor to a file request: Sent → Opened → n files sent. */
+export function RequestSteps({ g, open, endedByClose }: { g: GrantView; open: boolean; endedByClose: boolean }) {
+  const removed = g.status === 'revoked' && !endedByClose;
+  const sentDone = g.invitationStatus === 'accepted_by_provider';
+  const sentFailed = g.invitationStatus === 'failed';
+  const sent = sentDone || g.invitationStatus === 'queued' || !!g.invitedAt;
+  const opened = !!g.firstVerifiedAt;
+  const n = g.filesUploaded ?? 0;
+  const s1 = removed || sentFailed ? 'stop' : sentDone ? 'done' : sent ? 'on' : '';
+  const s2 = removed ? 'stop' : opened ? 'done' : s1 === 'done' && open ? 'on' : '';
+  const s3 = removed ? 'stop' : n > 0 ? 'done' : opened && open ? 'on' : '';
+  return (
+    <ol className="track" aria-label={`Progress for ${g.email}`}>
+      <li className={s1}>
+        {sentFailed ? 'Not delivered' : sentDone ? 'Sent' : sent ? 'Sending' : 'Not sent'}
+        <small>{sentFailed ? 'mail server refused' : g.invitedAt ? fmtShort(g.invitedAt) : ''}</small>
+      </li>
+      <li className={s2}>
+        {opened ? 'Opened' : 'Not opened'}
+        <small>{g.firstVerifiedAt ? fmtShort(g.firstVerifiedAt) : g.firstLinkSeenAt ? 'fetched, unverified' : ''}</small>
+      </li>
+      <li className={s3}>
+        {n > 0 ? `${n} file${n === 1 ? '' : 's'} sent` : 'Nothing sent'}
+        <small>{removed ? 'removed' : ''}</small>
+      </li>
+    </ol>
+  );
+}
+
+/** One plain-English sentence for a file request. "Received" means uploaded and passed the malware scan. */
+export function requestHeadline(t: { status: string; deletionStatus: string; expiresAt: string; closedAt?: string | null; grants: GrantView[]; files: { scanStatus: string; storageState: string; uploadStatus: string }[] }): string {
+  const received = t.files.filter((f) => f.uploadStatus === 'finalised' && f.scanStatus === 'clean').length;
+  const files = `${received} file${received === 1 ? '' : 's'}`;
+  const live = t.status === 'active' && t.deletionStatus === 'none' && new Date(t.expiresAt).getTime() > Date.now();
+  if (t.deletionStatus === 'deleted') return 'Files deleted. The record of what happened is kept.';
+  if (t.deletionStatus === 'failed') return 'Deletion failed. Access is blocked and administrators have been alerted.';
+  if (t.deletionStatus === 'pending' || t.deletionStatus === 'in_progress') return 'Request ended. Files are being deleted.';
+  if (t.status === 'revoked') return 'You withdrew this request.';
+  if (!live) return received ? `Closed. ${files} were received.`.replace('1 file were', '1 file was') : 'Closed. Nothing was received.';
+  if (t.closedAt) return received ? `Closed. ${files} received.` : 'Closed. Nothing was received.';
+  const asked = t.grants.filter((g) => g.status !== 'revoked');
+  const senders = asked.filter((g) => (g.filesUploaded ?? 0) > 0);
+  if (asked.length === 0) return received ? `${files} received. Nobody is being asked any more.` : 'Nobody is being asked. Add someone to continue.';
+  if (received > 0) {
+    if (asked.length === 1) return `${files} received from ${asked[0]!.email}.`;
+    return `${files} received from ${senders.length} of ${asked.length} people.`;
+  }
+  const opened = asked.filter((g) => g.firstVerifiedAt);
+  if (asked.length === 1) return opened.length ? `${asked[0]!.email} has opened your request but hasn't sent anything yet.` : `Waiting for ${asked[0]!.email} to send files.`;
+  return opened.length ? `${opened.length} of ${asked.length} people have opened your request; nothing has arrived yet.` : `Waiting for ${asked.length} people to send files.`;
+}

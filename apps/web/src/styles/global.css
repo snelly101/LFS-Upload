@@ -1291,6 +1291,14 @@ dialog.dialog::backdrop {
   background: var(--surface);
   outline-offset: 0;
 }
+/* a line whose label is a full question: label above, field below */
+.composer-line.stack {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.composer-line.stack > label {
+  padding: 4px 6px 0;
+}
 .composer-foot {
   display: flex;
   flex-wrap: wrap;
@@ -1610,6 +1618,12 @@ dialog.dialog::backdrop {
   border-color: var(--ink);
   color: var(--paper);
 }
+.filters-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border-strong);
+  margin: 2px 4px;
+}
 .filters form {
   margin-left: auto;
   display: flex;
@@ -1751,6 +1765,54 @@ dialog.dialog::backdrop {
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+/* received files on a request: name, who sent it and its scan state, with a download button when clean */
+.files-in li {
+  align-items: center;
+}
+.files-in .fname,
+.rcpt-up .fname {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.fstate.ok {
+  color: var(--ok);
+  font-weight: 600;
+}
+.fstate.err {
+  color: var(--err);
+  font-weight: 600;
+}
+.fstate.warn {
+  color: var(--warn);
+}
+/* a small bordered tag that marks something as incoming, never by colour alone */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-text);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  color: var(--ink-2);
+  vertical-align: 0.14em;
+  white-space: nowrap;
+}
+.tag-in {
+  border-color: var(--accent-line);
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+}
+.detail-head .tag,
+.composer .tag {
+  display: flex;
+  width: fit-content;
 }
 details.history > summary {
   padding: 10px 0;
@@ -1934,6 +1996,51 @@ details.history[open] > summary::before {
 .rcpt-until strong {
   display: block;
   color: var(--ink);
+}
+/* contributor upload area */
+.rcpt-drop {
+  position: relative;
+  margin: 4px 0 6px;
+  padding: 26px 18px 18px;
+  text-align: center;
+  background: var(--surface-2);
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  transition: background 0.12s, border-color 0.12s;
+}
+.rcpt-drop.over {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+}
+.rcpt-drop .or {
+  margin: 10px 0 0;
+  color: var(--ink-2);
+}
+.rcpt-drop .fine {
+  max-width: 32em;
+  margin: 12px auto 0;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+.rcpt-drop details.fine summary {
+  cursor: pointer;
+}
+.rcpt-drop details.fine .mono {
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.rcpt-up {
+  margin-top: 8px;
+}
+.rcpt-up li {
+  align-items: flex-start;
+}
+.rcpt-up .acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
 }
 .rcpt-foot {
   margin: 18px 4px 0;
@@ -2261,6 +2368,10 @@ details.history[open] > summary::before {
   }
   .strip .brand-name {
     font-size: 0.98rem;
+  }
+  /* three or four destinations leave no room for the name beside them: the monogram or logo stands alone */
+  .strip .brand-text {
+    display: none;
   }
   h1,
   .lede {

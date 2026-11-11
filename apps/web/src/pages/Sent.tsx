@@ -16,8 +16,39 @@ const FILTERS = [
   ['deleted', 'Deleted'],
 ] as const;
 
+/** A file request in the list: who was asked, what has come in. Marked with a tag, not colour alone. */
+function RequestRow({ t }: { t: TransferSummary }) {
+  const s = transferState(t);
+  const live = s.label === 'Active';
+  const asked = t.recipients.filter((r) => r.status !== 'revoked');
+  // The server says when a request was closed; fall back to "live with nobody left" for older rows.
+  const closed = live && (t.closedAt ? true : asked.length === 0);
+  const people = asked.length ? asked : t.recipients;
+  const from = people.length === 0 ? 'nobody' : people.length <= 2 ? people.map((r) => r.email).join(', ') : `${people[0]!.email} and ${people.length - 1} others`;
+  const n = t.filesReceived ?? t.fileCount;
+  const stand = n > 0 ? `${n} file${n === 1 ? '' : 's'} received` : live && !closed ? 'Nothing received yet' : 'Nothing was received';
+  const label = closed ? 'Closed' : live ? 'Open' : s.label;
+  return (
+    <Link to={`/sent/${t.id}`} className="sent-row">
+      <div style={{ minWidth: 0 }}>
+        <div className="t">{t.title || 'Untitled'}</div>
+        <div className="to"><span className="tag tag-in"><span aria-hidden="true">↓</span> Request</span> from {from}</div>
+      </div>
+      <div>
+        <span className={`stamp stamp-${closed ? 'neutral' : s.tone}`}>{label}</span>
+        <div className="standing">{stand}</div>
+      </div>
+      <div className="side">
+        <strong>{n ? `${n} file${n === 1 ? '' : 's'} · ${formatBytes(t.totalBytes)}` : 'No files yet'}</strong>
+        {live ? `${closed ? 'kept until' : 'until'} ${fmt(t.expiresAt)} (${countdown(t.expiresAt)})` : t.sentAt ? `asked ${fmt(t.sentAt)}` : `started ${fmt(t.createdAt)}`}
+      </div>
+    </Link>
+  );
+}
+
 /** One line per transfer: what, to whom, where it stands. */
 function Row({ t }: { t: TransferSummary }) {
+  if (t.direction === 'inbound') return <RequestRow t={t} />;
   const s = transferState(t);
   const live = s.label === 'Active';
   const unsent = ['draft', 'uploading', 'scanning', 'ready'].includes(t.status);
@@ -54,12 +85,13 @@ export function SentPage() {
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const status = params.get('status') ?? 'all';
+  const kind = params.get('kind') === 'requests' ? 'inbound' : params.get('kind') === 'sent' ? 'outbound' : 'all';
   const page = Number(params.get('page') ?? '1');
   const [draftQ, setDraftQ] = useState(q);
   const poll = usePollInterval(60_000);
   const query = useQuery({
-    queryKey: ['transfers', q, status, page],
-    queryFn: () => get<{ items: TransferSummary[]; total: number }>(`/api/transfers?q=${encodeURIComponent(q)}&status=${status}&page=${page}&pageSize=25`),
+    queryKey: ['transfers', q, status, kind, page],
+    queryFn: () => get<{ items: TransferSummary[]; total: number }>(`/api/transfers?q=${encodeURIComponent(q)}&status=${status}&direction=${kind}&page=${page}&pageSize=25`),
     refetchInterval: poll,
   });
   const set = (p2: Record<string, string>) => {
@@ -77,14 +109,17 @@ export function SentPage() {
   return (
     <>
       <h1 className="lede">Sent</h1>
-      <p className="lede-sub">Everything you have sent, and where each one stands.</p>
+      <p className="lede-sub">Everything you have sent or asked for, and where each one stands.</p>
       <div className="filters">
         {FILTERS.map(([k, label]) => (
           <button key={k} type="button" className="pill" aria-pressed={status === k} onClick={() => set({ status: k === 'all' ? '' : k })}>{label}</button>
         ))}
+        <span className="filters-sep" aria-hidden="true" />
+        <button type="button" className="pill" aria-pressed={kind === 'outbound'} onClick={() => set({ kind: kind === 'outbound' ? '' : 'sent' })}>Sent by me</button>
+        <button type="button" className="pill" aria-pressed={kind === 'inbound'} onClick={() => set({ kind: kind === 'inbound' ? '' : 'requests' })}>Requests</button>
         <form onSubmit={search} role="search">
           <label htmlFor="tq" className="visually-hidden">Search by subject or recipient</label>
-          <input id="tq" className="input" type="search" placeholder="Search subject or recipient" value={draftQ} onChange={(e) => setDraftQ(e.target.value)} />
+          <input id="tq" className="input" type="search" placeholder="Search subject or person" value={draftQ} onChange={(e) => setDraftQ(e.target.value)} />
           <button className="btn">Search</button>
         </form>
       </div>
@@ -116,7 +151,7 @@ export function RecentSends({ excludeId }: { excludeId?: string } = {}) {
   const poll = usePollInterval(60_000);
   const q = useQuery({ queryKey: ['transfers', 'recent'], queryFn: () => get<{ items: TransferSummary[]; total: number }>('/api/transfers?pageSize=8'), refetchInterval: poll });
   // Drafts that were discarded before sending are history for the Sent page, not something to show on the way in.
-  const discarded = (t: TransferSummary) => !t.sentAt && ['deleted', 'deleting', 'expired', 'revoked'].includes(t.status);
+  const discarded = (t: TransferSummary) => !t.sentAt && (t.deletionStatus !== 'none' || ['expired', 'revoked'].includes(t.status));
   const items = (q.data?.items ?? []).filter((t) => t.id !== excludeId && !discarded(t)).slice(0, 5);
   if (!items.length) return null;
   return (

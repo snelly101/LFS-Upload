@@ -251,6 +251,9 @@ export function TransferPolicySection() {
                 <span className="hint">Leave empty for no limit. Resuming an interrupted download does not use another go.</span>
               </div>
             </Group>
+            <Group title="Receiving files" note="A member of staff can ask named people outside the organisation to send files in.">
+              <Check label="Allow file requests" checked={d.allowFileRequests !== false} onChange={(v) => set({ allowFileRequests: v })} hint="Only the people named on a request can upload, each must verify by email code, every file is scanned before staff can open it, and what arrives counts against the requester's storage allowance." />
+            </Group>
             <Group title="File types" note="Checked on the file's extension when it is added.">
               <ListField id="t-block" label="Never allow" mono value={d.blockedExtensions} onChange={(v) => set({ blockedExtensions: v })} normalise={cleanExt} hint="Blocked always wins." />
               <ListField id="t-allow" label="Only allow" mono value={d.allowedExtensions} onChange={(v) => set({ allowedExtensions: v })} normalise={cleanExt} emptyMeans="Every type is allowed except those blocked above." />

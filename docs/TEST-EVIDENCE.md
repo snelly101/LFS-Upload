@@ -167,3 +167,31 @@ is recorded server-side (not at click time).
 
 Note on one-time codes: the helpers wait for the next 30-second TOTP step when a code for the
 shared dev account has already been used (server-side replay protection working as intended).
+
+## Update, 11 November 2026 (after the identity, performance and file-request work)
+
+```
+pnpm --filter @securesend/api run test
+ Test Files  20 passed | 1 skipped (21)
+      Tests  118 passed | 1 skipped (119)
+
+cd tests/e2e && npx playwright test
+  ✓ [desktop] recipient-journey  › recipient verifies by email code and downloads
+  ✓ [desktop] request-journey    › staff request files, a verified contributor uploads, staff download
+  ✓ [desktop] sender-journey     › sender creates, uploads, scans and sends a transfer (keyboard navigation)
+  ✓ [mobile]  recipient-journey  › recipient verifies by email code and downloads on mobile
+  4 passed
+```
+
+New integration files: `19-improvements` (one-query lists, honest size limit, contacts, reminders, live
+events, `/statusz`) and `20-file-requests` (seven scenarios: nothing revealed before verification,
+verification always required, contributors can never download, administrators cannot read received
+files, limits, blocked scans, close and expiry, withdraw, direction filter).
+
+The browser suite's `global-setup.ts` ages old verification challenges in the **local dev** database
+before a run, because repeated runs from loopback otherwise trip the per-source hourly code limit
+(the limit itself is covered by integration test 05). It refuses any non-localhost database.
+
+Not exercised: the operations scripts on the production host (lint-clean and run against stand-ins
+only), the CI workflow on a GitHub runner, emails in a real mail client, and pause/resume or
+session-expiry mid-upload on the contributor page.

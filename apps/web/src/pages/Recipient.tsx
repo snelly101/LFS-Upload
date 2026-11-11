@@ -1,12 +1,19 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { formatBytes, type RecipientAuthorisedView } from '@securesend/shared';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { formatBytes, type RecipientAuthorisedView, type RecipientInboundView } from '@securesend/shared';
 import { get, post, errorMessage, ApiError } from '../api';
 import { fmtLong, countdown } from '../lib/time';
 import { applyBrand } from '../lib/theme';
 import { Brand } from '../components/Brand';
 
+// The upload panel (and the resumable uploader behind it) is only fetched by people who were asked to send files.
+const ContributorPanel = lazy(() => import('./RecipientUpload'));
+type AnyView = RecipientAuthorisedView | RecipientInboundView;
+const isInbound = (v: AnyView): v is RecipientInboundView => 'direction' in v && v.direction === 'inbound';
+
 interface PublicView {
   state: 'needs_verification' | 'bearer_ready' | 'expired' | 'revoked' | 'unavailable' | 'not_found';
+  /** Only present while the link is usable: whether this person was sent files or asked to send some. */
+  purpose?: 'upload' | 'download';
   hasSession: boolean;
   productName: string;
   organisationName: string;
@@ -33,7 +40,8 @@ export default function RecipientPage() {
   const token = tokenFromPath();
   const base = `/api/r/${encodeURIComponent(token)}`;
   const [pub, setPub] = useState<PublicView | null>(null);
-  const [view, setView] = useState<RecipientAuthorisedView | null>(null);
+  const [view, setView] = useState<AnyView | null>(null);
+  const [gone, setGone] = useState(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
@@ -55,7 +63,7 @@ export default function RecipientPage() {
         applyBrand({ theme: p.theme, colourScheme: p.colourScheme, accentColour: p.accentColour });
         if (p.hasSession) {
           try {
-            setView(await get<RecipientAuthorisedView>(`${base}/view`));
+            setView(await get<AnyView>(`${base}/view`));
           } catch {
             /* session lapsed; show verification */
           }
@@ -83,9 +91,9 @@ export default function RecipientPage() {
     }
   }, [view, now]);
 
-  const say = (msg: string) => {
+  const say = useCallback((msg: string) => {
     if (live.current) live.current.textContent = msg;
-  };
+  }, []);
   const requestCode = async () => {
     setBusy(true);
     setErr(null);
@@ -106,10 +114,10 @@ export default function RecipientPage() {
     setBusy(true);
     setErr(null);
     try {
-      const r = await post<{ view: RecipientAuthorisedView }>(`${base}/verify`, { code });
+      const r = await post<{ view: AnyView }>(`${base}/verify`, { code });
       setSessionEnded(false);
       setView(r.view);
-      say('Verified. Your files are ready.');
+      say(isInbound(r.view) ? 'Verified. You can now send your files.' : 'Verified. Your files are ready.');
     } catch (x) {
       setErr(errorMessage(x));
       setCode('');
@@ -121,7 +129,7 @@ export default function RecipientPage() {
     setBusy(true);
     setErr(null);
     try {
-      const r = await post<{ view: RecipientAuthorisedView }>(`${base}/open`, {});
+      const r = await post<{ view: AnyView }>(`${base}/open`, {});
       setSessionEnded(false);
       setView(r.view);
     } catch (x) {
@@ -130,14 +138,26 @@ export default function RecipientPage() {
       setBusy(false);
     }
   };
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await post(`${base}/signout`, {}).catch(() => undefined);
     setView(null);
     setCodeSent(false);
     setCode('');
-  };
+  }, [base]);
+  // The contributor's session ran out mid-way: back to verification, with a word of explanation.
+  const sessionLost = useCallback(() => {
+    setView(null);
+    setCodeSent(false);
+    setCode('');
+    setSessionEnded(true);
+  }, []);
+  const requestGone = useCallback(() => {
+    setView(null);
+    setGone(true);
+  }, []);
   const ack = (fileId: string) => void post(`${base}/files/${fileId}/ack`, {}).catch(() => undefined);
 
+  const asked = pub?.purpose === 'upload' || (view ? isInbound(view) : false);
   const frame = (children: ReactNode, kicker?: string) => (
     <div className="rcpt">
       <header className="rcpt-head brand">
@@ -151,7 +171,7 @@ export default function RecipientPage() {
         {pub?.organisationName && <strong>{pub.organisationName}</strong>}
         {pub?.supportEmail ? <> · Questions? <a href={`mailto:${pub.supportEmail}`}>{pub.supportEmail}</a></> : null}
         {pub && <br />}
-        Sent over an encrypted connection and deleted after the expiry date. Verifying by email confirms control of the mailbox at this moment; it is not proof of identity.
+        {asked ? 'Files travel over an encrypted connection, are checked for malware and are deleted after the closing date.' : 'Sent over an encrypted connection and deleted after the expiry date.'} Verifying by email confirms control of the mailbox at this moment; it is not proof of identity.
       </p>
       <div ref={live} className="visually-hidden" aria-live="polite" />
     </div>
@@ -159,6 +179,17 @@ export default function RecipientPage() {
 
   if (loadErr) return frame(<><h1>This link cannot be opened</h1><p>{loadErr}</p><p className="muted">Please try again in a moment.</p></>);
   if (!pub) return frame(<p className="muted" role="status">Loading…</p>);
+
+  if (gone) return frame(<><h1>This link is no longer active</h1><p>It has been closed or has passed its end date, so nothing more can be sent here. If you think that is a mistake, please contact the person who sent it to you.</p></>);
+
+  if (view && isInbound(view)) {
+    return frame(
+      <Suspense fallback={<p className="muted" role="status">Loading…</p>}>
+        <ContributorPanel base={base} view={view} onView={setView} onSessionLost={sessionLost} onGone={requestGone} onSignOut={() => void signOut()} say={say} />
+      </Suspense>,
+      'File request from',
+    );
+  }
 
   if (view) {
     const expired = new Date(view.expiresAt).getTime() <= now;
@@ -219,13 +250,13 @@ export default function RecipientPage() {
 
   switch (pub.state) {
     case 'not_found':
-      return frame(<><h1>This link isn't recognised</h1><p>Check that the whole link was copied from the email. If you were sent a newer email about the same delivery, use the link in that one: older links stop working when a new one is issued.</p></>);
+      return frame(<><h1>This link isn't recognised</h1><p>Check that the whole link was copied from the email. If you were sent a newer email about the same thing, use the link in that one: older links stop working when a new one is issued.</p></>);
     case 'expired':
-      return frame(<><h1>This delivery has expired</h1><p>The files are no longer available. If you still need them, please ask the person who sent them to send a new delivery.</p></>);
+      return frame(<><h1>This link has expired</h1><p>It passed its end date and no longer works. If you still need it, please ask the person who sent it to you for a new one.</p></>);
     case 'revoked':
-      return frame(<><h1>This delivery was withdrawn</h1><p>The sender has withdrawn access. If you think that was a mistake, please contact them directly.</p></>);
+      return frame(<><h1>This link is no longer active</h1><p>The person who sent it has ended access. If you think that was a mistake, please contact them directly.</p></>);
     case 'unavailable':
-      return frame(<><h1>This delivery isn't available</h1><p>The files can't be downloaded at the moment. Please contact the person who sent them.</p></>);
+      return frame(<><h1>This link isn't available</h1><p>It can't be used at the moment. Please contact the person who sent it to you.</p></>);
     case 'bearer_ready':
       return frame(
         <>
@@ -239,11 +270,17 @@ export default function RecipientPage() {
     case 'needs_verification':
       return frame(
         <>
-          <h1>{sessionEnded ? 'Please verify again' : 'You have been sent files'}</h1>
-          {sessionEnded && <p className="muted">For your protection this page only stays open for a limited time.</p>}
-          <p>
-            To open them, we'll email a one-time code to <strong>{pub.recipientHint}</strong>. Only someone who can read that mailbox can open this delivery.
-          </p>
+          <h1>{sessionEnded ? 'Please verify again' : asked ? 'You have been asked to send files' : 'You have been sent files'}</h1>
+          {sessionEnded && <p className="muted">For your protection this page only stays open for a limited time.{asked ? ' Files you have already sent are safe.' : ''}</p>}
+          {asked ? (
+            <p>
+              To see who is asking and send them, we'll email a one-time code to <strong>{pub.recipientHint}</strong>. Only someone who can read that mailbox can continue.
+            </p>
+          ) : (
+            <p>
+              To open them, we'll email a one-time code to <strong>{pub.recipientHint}</strong>. Only someone who can read that mailbox can open this delivery.
+            </p>
+          )}
           {err && <div className="notice notice-err" role="alert">{err}</div>}
           {!codeSent ? (
             <button className="btn btn-primary btn-lg" onClick={() => void requestCode()} disabled={busy || cooldown > 0}>
@@ -258,7 +295,7 @@ export default function RecipientPage() {
                 <label htmlFor="code">Enter the code from the email</label>
                 <input id="code" className="input code-input" inputMode="numeric" autoComplete="one-time-code" pattern="\d{6,8}" maxLength={8} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} autoFocus required />
               </div>
-              <button className="btn btn-primary btn-lg" disabled={busy || code.length < 6}>Open transfer</button>
+              <button className="btn btn-primary btn-lg" disabled={busy || code.length < 6}>{asked ? 'Continue' : 'Open transfer'}</button>
               <p className="small muted" style={{ marginTop: 14, marginBottom: 0 }}>
                 Nothing yet? Check your junk folder, or{' '}
                 <button type="button" className="btn-link" onClick={() => void requestCode()} disabled={busy || cooldown > 0}>{cooldown > 0 ? `send a new code in ${cooldown}s` : 'send a new code'}</button>. A new code replaces the old one.
@@ -266,7 +303,7 @@ export default function RecipientPage() {
             </form>
           )}
         </>,
-        'Secure delivery',
+        asked ? 'Secure file request' : 'Secure delivery',
       );
   }
 }

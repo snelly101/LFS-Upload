@@ -113,7 +113,7 @@ services:
         limits: { cpus: "2.0", memory: 1024M }
 
   db:
-    image: postgres:16.15-bookworm
+    image: postgres:19.0-bookworm
     restart: unless-stopped
     environment:
       POSTGRES_DB: securesend

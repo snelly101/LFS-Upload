@@ -172,7 +172,7 @@ services:
 
   # Development only: `docker compose --profile dev up`. Captures all outbound mail; never reaches real inboxes.
   mailpit:
-    image: axllent/mailpit:v1.22.3
+    image: axllent/mailpit:v1.34.0
     profiles: [dev]
     networks: [backend]
     ports:

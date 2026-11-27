@@ -101,7 +101,7 @@ export const BrandingSchema = z.object({
     .default('#11665C'),
   logoDataUrl: z.string().max(200_000).nullable().default(null),
   defaultTimeZone: z.string().default('Europe/London'),
-  /** Visual theme. 'civic' = warm paper with serif headings; 'clear' = cool, crisp sans. */
+  /** Tone of the one design: 'civic' = warm neutrals, 'clear' = cool greys. (Names kept for stored settings.) */
   theme: z.enum(['civic', 'clear']).default('civic'),
   /** Colour scheme: follow the device, or force light/dark. */
   colourScheme: z.enum(['auto', 'light', 'dark']).default('auto'),

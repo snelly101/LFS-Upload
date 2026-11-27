@@ -29,7 +29,7 @@ function AccentPreview({ d }: { d: Branding }) {
       <div className="preview-pair" aria-label="Accent colour preview">
         {panes.map(({ scheme, a, p }) => (
           <div key={scheme} className="preview-pane" style={{ background: p.surface, color: p.ink, borderColor: p.line, fontFamily: p.text }}>
-            <div style={{ fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: p.muted, marginBottom: 6 }}>{scheme} mode</div>
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: p.muted, marginBottom: 6 }}>{scheme === 'light' ? 'Light mode' : 'Dark mode'}</div>
             <div style={{ fontFamily: p.display, fontSize: '1.15rem', fontWeight: 600, marginBottom: 8 }}>Send files securely</div>
             <span className="pv-btn" style={{ background: a.accent, color: a.onAccent }}>Choose files</span>
             <div style={{ marginTop: 10, fontSize: '0.9rem' }}>
@@ -91,8 +91,8 @@ export function BrandingSection() {
               )}
             </div>
           </Group>
-          <Group title="Look" note="Two designs are built in. Civic is warm and editorial with serif headings; Clear is cool and plain. Try both here before saving.">
-            <Segmented legend="Design" value={d.theme} onChange={(v) => set({ theme: v })} options={[{ value: 'civic', label: 'Civic' }, { value: 'clear', label: 'Clear' }]} />
+          <Group title="Look" note="One design in two tones. Warm uses soft, paper-like neutrals; Cool uses crisp greys. Try both here before saving.">
+            <Segmented legend="Tone" value={d.theme} onChange={(v) => set({ theme: v })} options={[{ value: 'civic', label: 'Warm' }, { value: 'clear', label: 'Cool' }]} />
             <Segmented legend="Light or dark" value={d.colourScheme} onChange={(v) => set({ colourScheme: v })} options={[{ value: 'auto', label: "Follow each person's device" }, { value: 'light', label: 'Always light' }, { value: 'dark', label: 'Always dark' }]} />
             <div className="field">
               <label htmlFor="b-accent">Accent colour</label>

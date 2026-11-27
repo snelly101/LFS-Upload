@@ -3,6 +3,7 @@ import { formatBytes, type RecipientAuthorisedView, type RecipientInboundView } 
 import { get, post, errorMessage, ApiError } from '../api';
 import { fmtLong, countdown } from '../lib/time';
 import { applyBrand } from '../lib/theme';
+import { Icon, FileIcon, Avatar } from '../components/Icon';
 import { Brand } from '../components/Brand';
 
 // The upload panel (and the resumable uploader behind it) is only fetched by people who were asked to send files.
@@ -177,10 +178,10 @@ export default function RecipientPage() {
     </div>
   );
 
-  if (loadErr) return frame(<><h1>This link cannot be opened</h1><p>{loadErr}</p><p className="muted">Please try again in a moment.</p></>);
+  if (loadErr) return frame(<><span className="hero-ico off" aria-hidden="true"><Icon name="alert" size={26} /></span><h1>This link cannot be opened</h1><p>{loadErr}</p><p className="muted">Please try again in a moment.</p></>);
   if (!pub) return frame(<p className="muted" role="status">Loading…</p>);
 
-  if (gone) return frame(<><h1>This link is no longer active</h1><p>It has been closed or has passed its end date, so nothing more can be sent here. If you think that is a mistake, please contact the person who sent it to you.</p></>);
+  if (gone) return frame(<><span className="hero-ico off" aria-hidden="true"><Icon name="alert" size={26} /></span><h1>This link is no longer active</h1><p>It has been closed or has passed its end date, so nothing more can be sent here. If you think that is a mistake, please contact the person who sent it to you.</p></>);
 
   if (view && isInbound(view)) {
     return frame(
@@ -197,10 +198,13 @@ export default function RecipientPage() {
     return frame(
       <>
         <div className="rcpt-from">
-          <div className="name">{view.senderName}</div>
-          <div className="small muted" style={{ overflowWrap: 'anywhere' }}>
-            {view.senderEmail}
-            {view.recipientEmail ? <> · for {view.recipientEmail}</> : <> · opened with a link that needs no verification</>}
+          <Avatar text={view.senderName || view.senderEmail} size="lg" />
+          <div style={{ minWidth: 0 }}>
+            <div className="name">{view.senderName}</div>
+            <div className="small muted" style={{ overflowWrap: 'anywhere' }}>
+              {view.senderEmail}
+              {view.recipientEmail ? <> · for {view.recipientEmail}</> : <> · opened with a link that needs no verification</>}
+            </div>
           </div>
         </div>
         {view.title && <h1 style={{ fontSize: '1.3rem' }}>{view.title}</h1>}
@@ -209,12 +213,13 @@ export default function RecipientPage() {
         <ul className="rcpt-files" aria-label="Files">
           {view.files.map((f) => (
             <li key={f.id}>
-              <span>
+              <FileIcon name={f.name} />
+              <span className="grow" style={{ minWidth: 0 }}>
                 <span className="fname">{f.name}</span>
                 <div className="small muted num">{formatBytes(f.sizeBytes)}</div>
               </span>
               {!single && !expired && (
-                <a className="btn btn-sm" href={`${base}/files/${f.id}`} download={f.name} aria-label={`Download ${f.name}`} onClick={() => ack(f.id)}>Download</a>
+                <a className="btn btn-sm" href={`${base}/files/${f.id}`} download={f.name} aria-label={`Download ${f.name}`} onClick={() => ack(f.id)}><Icon name="download" size={16} />Download</a>
               )}
             </li>
           ))}
@@ -222,9 +227,9 @@ export default function RecipientPage() {
         {!expired && (
           <div className="rcpt-cta">
             {single ? (
-              <a className="btn btn-primary btn-lg" href={`${base}/files/${single.id}`} download={single.name} aria-label={`Download ${single.name}`} onClick={() => ack(single.id)}>Download · {formatBytes(view.totalBytes)}</a>
+              <a className="btn btn-primary btn-lg" href={`${base}/files/${single.id}`} download={single.name} aria-label={`Download ${single.name}`} onClick={() => ack(single.id)}><Icon name="download" size={20} />Download · {formatBytes(view.totalBytes)}</a>
             ) : (
-              <a className="btn btn-primary btn-lg" href={`${base}/zip`} aria-describedby="dl-note">Download all · {formatBytes(view.totalBytes)}</a>
+              <a className="btn btn-primary btn-lg" href={`${base}/zip`} aria-describedby="dl-note"><Icon name="download" size={20} />Download all · {formatBytes(view.totalBytes)}</a>
             )}
             <div className="rcpt-until">
               Available until
@@ -250,16 +255,17 @@ export default function RecipientPage() {
 
   switch (pub.state) {
     case 'not_found':
-      return frame(<><h1>This link isn't recognised</h1><p>Check that the whole link was copied from the email. If you were sent a newer email about the same thing, use the link in that one: older links stop working when a new one is issued.</p></>);
+      return frame(<><span className="hero-ico off" aria-hidden="true"><Icon name="alert" size={26} /></span><h1>This link isn't recognised</h1><p>Check that the whole link was copied from the email. If you were sent a newer email about the same thing, use the link in that one: older links stop working when a new one is issued.</p></>);
     case 'expired':
-      return frame(<><h1>This link has expired</h1><p>It passed its end date and no longer works. If you still need it, please ask the person who sent it to you for a new one.</p></>);
+      return frame(<><span className="hero-ico off" aria-hidden="true"><Icon name="alert" size={26} /></span><h1>This link has expired</h1><p>It passed its end date and no longer works. If you still need it, please ask the person who sent it to you for a new one.</p></>);
     case 'revoked':
-      return frame(<><h1>This link is no longer active</h1><p>The person who sent it has ended access. If you think that was a mistake, please contact them directly.</p></>);
+      return frame(<><span className="hero-ico off" aria-hidden="true"><Icon name="alert" size={26} /></span><h1>This link is no longer active</h1><p>The person who sent it has ended access. If you think that was a mistake, please contact them directly.</p></>);
     case 'unavailable':
-      return frame(<><h1>This link isn't available</h1><p>It can't be used at the moment. Please contact the person who sent it to you.</p></>);
+      return frame(<><span className="hero-ico off" aria-hidden="true"><Icon name="alert" size={26} /></span><h1>This link isn't available</h1><p>It can't be used at the moment. Please contact the person who sent it to you.</p></>);
     case 'bearer_ready':
       return frame(
         <>
+          <span className="hero-ico" aria-hidden="true"><Icon name="download" size={26} /></span>
           <h1>You have been sent files</h1>
           <p>This link opens the delivery without a code. Anyone who has the link can download the files, so please don't forward it.</p>
           {err && <div className="notice notice-err" role="alert">{err}</div>}
@@ -270,6 +276,7 @@ export default function RecipientPage() {
     case 'needs_verification':
       return frame(
         <>
+          <span className="hero-ico" aria-hidden="true"><Icon name={codeSent ? 'mail' : 'lock'} size={26} /></span>
           <h1>{sessionEnded ? 'Please verify again' : asked ? 'You have been asked to send files' : 'You have been sent files'}</h1>
           {sessionEnded && <p className="muted">For your protection this page only stays open for a limited time.{asked ? ' Files you have already sent are safe.' : ''}</p>}
           {asked ? (

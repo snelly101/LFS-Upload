@@ -1,6 +1,6 @@
 /**
- * Theme application. Two themes ('civic', 'clear') × two schemes (light, dark) are defined as CSS
- * tokens in styles/tokens.css. The organisation's accent colour is the only runtime-computed part:
+ * Theme application. One design in two tones ('civic' = warm, 'clear' = cool) × two schemes (light,
+ * dark), defined as CSS tokens in styles/tokens.css. The organisation's accent colour is the only runtime-computed part:
  * from one hex value we derive a button colour, a text-safe variant, a tint and the text colour to
  * put on top of it, each checked against WCAG AA for the active scheme.
  */
@@ -51,8 +51,8 @@ export function ensureContrast(c: RGB, against: RGB, want: number, towards: RGB)
 
 /** Surfaces per theme/scheme: [paper, surface]. Kept in step with tokens.css. */
 const SURFACES: Record<ThemeName, Record<Scheme, [RGB, RGB]>> = {
-  civic: { light: [[244, 240, 232], [255, 253, 248]], dark: [[22, 25, 26], [31, 35, 36]] },
-  clear: { light: [[245, 246, 248], [255, 255, 255]], dark: [[15, 18, 22], [23, 27, 33]] },
+  civic: { light: [[247, 245, 241], [255, 255, 255]], dark: [[16, 15, 13], [25, 24, 22]] },
+  clear: { light: [[245, 246, 248], [255, 255, 255]], dark: [[12, 14, 18], [20, 23, 29]] },
 };
 
 export interface AccentTokens {
@@ -157,13 +157,14 @@ export function currentScheme(): Scheme {
 }
 
 /** Static colours for the Branding preview panes (kept in step with tokens.css). */
+const FONT = "'Figtree', system-ui, sans-serif";
 export const PREVIEW: Record<ThemeName, Record<Scheme, { paper: string; surface: string; ink: string; muted: string; line: string; display: string; text: string }>> = {
   civic: {
-    light: { paper: '#f4f0e8', surface: '#fffdf8', ink: '#1d2a2e', muted: '#636b66', line: '#dcd5c6', display: "'Fraunces', Georgia, serif", text: "'Public Sans', system-ui, sans-serif" },
-    dark: { paper: '#16191a', surface: '#1f2324', ink: '#ece7dc', muted: '#9a968c', line: '#353b3c', display: "'Fraunces', Georgia, serif", text: "'Public Sans', system-ui, sans-serif" },
+    light: { paper: '#f7f5f1', surface: '#ffffff', ink: '#171512', muted: '#6b655c', line: '#e8e4dc', display: FONT, text: FONT },
+    dark: { paper: '#100f0d', surface: '#191816', ink: '#f2efe9', muted: '#979085', line: '#2a2825', display: FONT, text: FONT },
   },
   clear: {
-    light: { paper: '#f5f6f8', surface: '#ffffff', ink: '#14181f', muted: '#5f6775', line: '#dee2e8', display: "'Inter', system-ui, sans-serif", text: "'Inter', system-ui, sans-serif" },
-    dark: { paper: '#0f1216', surface: '#171b21', ink: '#e8ebf0', muted: '#8d95a3', line: '#2b323c', display: "'Inter', system-ui, sans-serif", text: "'Inter', system-ui, sans-serif" },
+    light: { paper: '#f5f6f8', surface: '#ffffff', ink: '#0e1217', muted: '#636d7b', line: '#e6e9ee', display: FONT, text: FONT },
+    dark: { paper: '#0c0e12', surface: '#14171d', ink: '#eef1f5', muted: '#8d96a5', line: '#232832', display: FONT, text: FONT },
   },
 };

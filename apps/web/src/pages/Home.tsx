@@ -5,6 +5,7 @@ import type * as Tus from 'tus-js-client';
 import { formatBytes, formatDuration, formatRate, type TransferDetail, type TransferFileView, type TransferPolicy, type TransferSummary } from '@securesend/shared';
 import { get, post, patch, put, del, errorMessage } from '../api';
 import { Picker } from '../components/Picker';
+import { Icon, FileIcon } from '../components/Icon';
 import { fmtLong, toLocalInput, fromLocalInput } from '../lib/time';
 import { peopleLabel, refCode } from '../lib/labels';
 import { useAuth } from '../auth/AuthContext';
@@ -500,7 +501,7 @@ export function HomePage() {
       <div className="home">
         <section className="ticket" aria-live="polite" aria-label="Dispatch confirmation">
           <div className="ticket-main">
-            <p className="caps" style={{ marginBottom: 6 }}>Dispatched</p>
+            <span className="success-mark" aria-hidden="true"><Icon name="check" size={28} /></span>
             <h1>Sent to {peopleLabel(who)}</h1>
             <p>
               {who.length === 1 ? <strong>{who[0]}</strong> : who.map((w) => <strong key={w}>{w}</strong>).reduce<React.ReactNode[]>((acc, el, i) => (i ? [...acc, ', ', el] : [el]), [])} will get an email with a personal link.
@@ -510,7 +511,7 @@ export function HomePage() {
               {sent.fileCount} file{sent.fileCount === 1 ? '' : 's'}, {formatBytes(sent.totalBytes)} · available until <strong>{fmtLong(sent.expiresAt)}</strong>, then deleted.
             </p>
             <p className="row" style={{ marginTop: 18, marginBottom: 0 }}>
-              <Link to={`/sent/${sent.id}`} className="btn btn-primary">Track it</Link>
+              <Link to={`/sent/${sent.id}`} className="btn btn-primary">Track it<Icon name="arrow-right" /></Link>
               <button type="button" className="btn" onClick={() => window.location.assign('/')}>Send more files</button>
             </p>
           </div>
@@ -558,13 +559,21 @@ export function HomePage() {
 
       {!hasFiles ? (
         <section className={`home-drop ${pageOver ? 'over' : ''}`} aria-labelledby="home-h">
+          <span className="drop-ico" aria-hidden="true"><Icon name="upload" size={32} /></span>
           <h1 id="home-h">Send files securely</h1>
           <p>Drop files anywhere on this page, or</p>
           <button type="button" className="btn btn-primary btn-lg" onClick={() => fileInput.current?.click()}>Choose files</button>
           {policy && (
-            <p className="fine">
-              Up to {formatBytes(policy.effectiveMaxFileBytes ?? policy.transferPolicy.maxFileBytes, 0)} per file{policy.scanLimited ? ' (the most our malware scanner can check)' : ''}, {formatBytes(policy.transferPolicy.maxTransferBytes, 0)} in total. Every file is checked for malware before it can be sent.
-            </p>
+            <>
+              <ul className="assure">
+                <li><Icon name="shield" size={16} />Every file is checked for malware</li>
+                {policy.verification.mode === 'required' && <li><Icon name="mail" size={16} />Recipients verify by email code</li>}
+                <li><Icon name="clock" size={16} />Deleted when access ends</li>
+              </ul>
+              <p className="fine">
+                Up to {formatBytes(policy.effectiveMaxFileBytes ?? policy.transferPolicy.maxFileBytes, 0)} per file{policy.scanLimited ? ' (the most our malware scanner can check)' : ''}, {formatBytes(policy.transferPolicy.maxTransferBytes, 0)} in total.
+              </p>
+            </>
           )}
         </section>
       ) : (
@@ -607,15 +616,16 @@ export function HomePage() {
                 }
                 return (
                   <div className="filerow" key={u.key}>
+                    <FileIcon name={u.file.name || f?.displayName || ''} state={state.tone === 'err' ? 'err' : ''} />
                     <span className="name">{u.file.name || f?.displayName}</span>
                     <span className={`state ${state.tone}`}>
                       {formatBytes(size)}
                       {state.text ? ` · ${state.text}` : ''}
                     </span>
                     <span className="acts">
-                      {u.status === 'uploading' && <button type="button" className="btn btn-sm" onClick={() => pause(u)}>Pause</button>}
-                      {(u.status === 'paused' || u.status === 'error') && <button type="button" className="btn btn-sm" onClick={() => resume(u)}>Resume</button>}
-                      <button type="button" className="btn btn-sm" onClick={() => void remove(u)} aria-label={`Remove ${u.file.name || f?.displayName}`}>Remove</button>
+                      {u.status === 'uploading' && <button type="button" className="icon-btn sm" onClick={() => pause(u)} aria-label={`Pause ${u.file.name}`} title="Pause"><Icon name="pause" /></button>}
+                      {(u.status === 'paused' || u.status === 'error') && <button type="button" className="icon-btn sm" onClick={() => resume(u)} aria-label={`Resume ${u.file.name || f?.displayName}`} title="Resume"><Icon name="play" /></button>}
+                      <button type="button" className="icon-btn sm danger" onClick={() => void remove(u)} aria-label={`Remove ${u.file.name || f?.displayName}`} title="Remove"><Icon name="x" /></button>
                     </span>
                     {(u.status === 'uploading' || u.status === 'paused') && (
                       <div className="bar progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={`${u.file.name} progress`}>
@@ -626,7 +636,7 @@ export function HomePage() {
                 );
               })}
             </div>
-            <button type="button" className="addmore" onClick={() => fileInput.current?.click()}>+ Add more files</button>
+            <button type="button" className="addmore" onClick={() => fileInput.current?.click()}><Icon name="plus" size={16} />Add more files</button>
           </div>
 
           <div className="composer-line">
@@ -636,7 +646,7 @@ export function HomePage() {
                 {emails.map((em) => (
                   <span key={em} className={`chip ${!EMAIL_RE.test(em) || domainBlocked.includes(em) ? 'chip-invalid' : ''}`}>
                     {em}
-                    <button type="button" aria-label={`Remove ${em}`} onClick={() => setEmails((x) => x.filter((y) => y !== em))}>×</button>
+                    <button type="button" aria-label={`Remove ${em}`} onClick={() => setEmails((x) => x.filter((y) => y !== em))}><Icon name="x" size={14} /></button>
                   </span>
                 ))}
                 <input
@@ -678,13 +688,12 @@ export function HomePage() {
           ) : (
             <div className="composer-line">
               <span className="lbl" aria-hidden="true" />
-              <button type="button" className="addmore" style={{ margin: 0 }} onClick={() => setShowNote(true)}>+ Add a note</button>
+              <button type="button" className="addmore" style={{ margin: '0 0 0 -4px' }} onClick={() => setShowNote(true)}><Icon name="plus" size={16} />Add a note</button>
             </div>
           )}
 
           <div className="composer-foot">
-            <div className="sentence" style={{ margin: 0, width: '100%' }}>
-              {expiryPreset === 'custom' ? 'Available until' : 'Available for'}{' '}
+            <div className="opts">
               <Picker<ExpiryPreset>
                 ariaLabel="How long the files are available"
                 value={expiryPreset}
@@ -701,10 +710,9 @@ export function HomePage() {
                   )
                 }
               >
-                {expiryWord}
+                <Icon name="clock" size={16} />
+                {expiryPreset === 'custom' ? `Until ${expiryWord}` : `Available for ${expiryWord}`}
               </Picker>
-              {expiryPreset !== 'custom' && expiryIso && <span className="muted small"> (until {fmtLong(expiryIso)})</span>}
-              <span className="dot">·</span>
               <Picker<'required' | 'bearer'>
                 ariaLabel="Recipient verification"
                 value={verification}
@@ -716,16 +724,16 @@ export function HomePage() {
                 ]}
                 onChange={setVerification}
               >
-                {verification === 'required' ? 'email code required' : 'no verification'}
+                <Icon name={verification === 'required' ? 'shield' : 'alert'} size={16} />
+                {verification === 'required' ? 'Email code required' : 'No verification'}
               </Picker>
-              <span className="dot">·</span>
-              Tell me about{' '}
               <Picker<NotifyPreset> ariaLabel="Email notifications to you" value={notify} options={notifyChoices} onChange={setNotify}>
-                {notifyWord}
+                <Icon name="bell" size={16} />
+                {notify === 'none' ? 'No emails to me' : `Tell me about ${notifyWord}`}
               </Picker>
-              <details style={{ display: 'inline-block', marginLeft: 10 }}>
-                <summary className="small" style={{ cursor: 'pointer', color: 'var(--accent)' }}>More options</summary>
-                <div style={{ margin: '10px 0 4px', display: 'grid', gap: 8, maxWidth: 420 }}>
+              <details className="more-opts">
+                <summary>More options<Icon name="chevron-down" size={14} className="chev" /></summary>
+                <div className="more-body">
                   <label className="small" htmlFor="limit">
                     Download limit per recipient{policy?.transferPolicy.maxDownloadsPerRecipient !== null && policy ? ` (max ${policy.transferPolicy.maxDownloadsPerRecipient})` : ''}
                     <input id="limit" className="input" type="number" min={1} max={policy?.transferPolicy.maxDownloadsPerRecipient ?? 1000} value={limit} onChange={(e) => setLimit(e.target.value)} placeholder="Unlimited" style={{ marginTop: 4 }} />
@@ -740,10 +748,11 @@ export function HomePage() {
                 </div>
               </details>
             </div>
-            {summary && <div className="small muted" style={{ margin: 0, width: '100%' }} aria-live="polite">{summary}</div>}
+            <div className="small muted" style={{ margin: 0, width: '100%' }} aria-live="polite">{summary ?? (expiryIso ? `Available until ${fmtLong(expiryIso)}, then deleted.` : '')}</div>
             <span className="why grow" aria-live="polite">{why ?? 'Ctrl + Enter also sends.'}</span>
             <button type="submit" className="btn btn-primary sendbtn" disabled={!canSend}>
               {sending ? 'Sending…' : `Send ${uploads.length === 1 ? '1 file' : `${uploads.length} files`} to ${peopleLabel(emails)}`}
+              {!sending && <Icon name="send" />}
             </button>
           </div>
         </form>

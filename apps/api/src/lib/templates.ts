@@ -40,8 +40,7 @@ function onAccent(hex: string): string {
   return 1.05 / (L + 0.05) >= 4.5 ? '#FFFFFF' : '#11181A';
 }
 
-const SERIF = "Georgia,'Times New Roman',Times,serif";
-const SANS = "'Segoe UI',Helvetica,Arial,sans-serif";
+const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 /**
  * One layout for every message: table-based with inline styles so it survives Outlook, no remote
@@ -54,24 +53,27 @@ export function layout(ctx: TemplateContext, title: string, bodyHtml: string, fo
   return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>${esc(title)}</title>
 <style>
 @media (prefers-color-scheme: dark) {
-  .ss-page { background: #16191A !important; }
-  .ss-card { background: #1F2324 !important; border-color: #353B3C !important; }
-  .ss-text, .ss-text p, .ss-name { color: #ECE7DC !important; }
-  .ss-muted, .ss-muted p, .ss-org { color: #A9A59B !important; }
-  .ss-rule { border-color: #353B3C !important; }
-  .ss-code { background: #272C2D !important; color: #ECE7DC !important; border-color: #525A5B !important; }
+  .ss-page { background: #0C0E12 !important; }
+  .ss-card { background: #14171D !important; border-color: #232832 !important; }
+  .ss-text, .ss-text p, .ss-name { color: #EEF1F5 !important; }
+  .ss-muted, .ss-muted p, .ss-org { color: #8D96A5 !important; }
+  .ss-rule { border-color: #232832 !important; }
+  .ss-code { background: #1B1F27 !important; color: #EEF1F5 !important; border-color: #363D4A !important; }
 }
 </style></head>
-<body class="ss-page" style="margin:0;padding:0;background:#F4F0E8;">
-<table role="presentation" class="ss-page" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#F4F0E8" style="background:#F4F0E8;"><tr><td align="center" style="padding:32px 12px;">
-<table role="presentation" class="ss-card" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#FFFDF8" style="max-width:580px;background:#FFFDF8;border:1px solid #DCD5C6;">
-<tr><td height="4" bgcolor="${esc(accent)}" style="height:4px;line-height:4px;font-size:0;background:${esc(accent)};">&nbsp;</td></tr>
-<tr><td class="ss-rule" style="padding:22px 30px 18px;border-bottom:1px solid #DCD5C6;">
-${org ? `<div class="ss-org" style="font-family:${SANS};font-size:11px;line-height:16px;font-weight:bold;letter-spacing:1.6px;text-transform:uppercase;color:#636B66;">${esc(org)}</div>` : ''}
-<div class="ss-name" style="font-family:${SERIF};font-size:20px;line-height:26px;font-weight:bold;color:#1D2A2E;">${esc(name)}</div>
+<body class="ss-page" style="margin:0;padding:0;background:#F5F6F8;">
+<table role="presentation" class="ss-page" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#F5F6F8" style="background:#F5F6F8;"><tr><td align="center" style="padding:32px 12px;">
+<table role="presentation" class="ss-card" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#FFFFFF" style="max-width:580px;background:#FFFFFF;border:1px solid #E6E9EE;border-radius:16px;">
+<tr><td class="ss-rule" style="padding:24px 30px 18px;border-bottom:1px solid #E6E9EE;">
+<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+<td width="10" bgcolor="${esc(accent)}" style="width:10px;background:${esc(accent)};border-radius:5px;font-size:0;line-height:0;">&nbsp;</td>
+<td style="padding-left:12px;">
+${org ? `<div class="ss-org" style="font-family:${SANS};font-size:12px;line-height:16px;font-weight:600;color:#636D7B;">${esc(org)}</div>` : ''}
+<div class="ss-name" style="font-family:${SANS};font-size:19px;line-height:25px;font-weight:bold;color:#0E1217;">${esc(name)}</div>
+</td></tr></table>
 </td></tr>
-<tr><td class="ss-text" style="padding:26px 30px 24px;font-family:${SANS};font-size:16px;line-height:25px;color:#1D2A2E;">${bodyHtml}</td></tr>
-<tr><td class="ss-muted ss-rule" style="padding:16px 30px 20px;border-top:1px solid #DCD5C6;font-family:${SANS};font-size:12px;line-height:18px;color:#636B66;">${esc(ctx.organisationName)}${ctx.supportEmail ? ` &middot; Help: <a href="mailto:${esc(ctx.supportEmail)}" style="color:#636B66;">${esc(ctx.supportEmail)}</a>` : ''}${footerNote ? `<br>${esc(footerNote)}` : ''}</td></tr>
+<tr><td class="ss-text" style="padding:26px 30px 24px;font-family:${SANS};font-size:16px;line-height:25px;color:#0E1217;">${bodyHtml}</td></tr>
+<tr><td class="ss-muted ss-rule" style="padding:16px 30px 20px;border-top:1px solid #E6E9EE;font-family:${SANS};font-size:12px;line-height:18px;color:#636D7B;">${esc(ctx.organisationName)}${ctx.supportEmail ? ` &middot; Help: <a href="mailto:${esc(ctx.supportEmail)}" style="color:#636D7B;">${esc(ctx.supportEmail)}</a>` : ''}${footerNote ? `<br>${esc(footerNote)}` : ''}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
@@ -79,8 +81,8 @@ ${org ? `<div class="ss-org" style="font-family:${SANS};font-size:11px;line-heig
 export function button(ctx: TemplateContext, href: string, label: string): string {
   const accent = /^#[0-9a-f]{6}$/i.test(ctx.accentColour) ? ctx.accentColour : '#11665C';
   const fg = onAccent(accent);
-  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:22px 0 18px;"><tr><td bgcolor="${esc(accent)}" style="background:${esc(accent)};border-radius:3px;"><a href="${esc(href)}" style="display:inline-block;padding:13px 24px;font-family:${SANS};font-size:16px;line-height:20px;font-weight:bold;color:${fg};text-decoration:none;">${esc(label)}</a></td></tr></table>
-<p class="ss-muted" style="margin:0 0 6px;font-size:13px;line-height:19px;color:#636B66;">If the button does not work, copy this link into your browser:<br><span style="word-break:break-all;">${esc(href)}</span></p>`;
+  return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:22px 0 18px;"><tr><td bgcolor="${esc(accent)}" style="background:${esc(accent)};border-radius:10px;"><a href="${esc(href)}" style="display:inline-block;padding:13px 24px;font-family:${SANS};font-size:16px;line-height:20px;font-weight:bold;color:${fg};text-decoration:none;">${esc(label)}</a></td></tr></table>
+<p class="ss-muted" style="margin:0 0 6px;font-size:13px;line-height:19px;color:#636D7B;">If the button does not work, copy this link into your browser:<br><span style="word-break:break-all;">${esc(href)}</span></p>`;
 }
 
 export const templates = {
@@ -122,9 +124,9 @@ If you did not request this code, you can ignore this message. Someone may have 
       ctx,
       subject,
       `<p>Your verification code is:</p>
-       <p class="ss-code" style="margin:12px 0 20px;padding:14px 18px;display:inline-block;background:#EFEADF;border:1px dashed #B4AA96;font-family:'Courier New',Courier,monospace;font-size:30px;line-height:36px;letter-spacing:6px;font-weight:bold;color:#1D2A2E;">${esc(d.code)}</p>
+       <p class="ss-code" style="margin:12px 0 20px;padding:14px 18px;display:inline-block;background:#F1F3F6;border:1px solid #E6E9EE;border-radius:12px;font-family:'Courier New',Courier,monospace;font-size:30px;line-height:36px;letter-spacing:6px;font-weight:bold;color:#0E1217;">${esc(d.code)}</p>
        <p>It expires in ${d.ttlMinutes} minutes and can only be used once, on the page where you requested it.</p>
-       <p class="ss-muted" style="color:#636B66;font-size:13px;line-height:19px;">If you did not request this code you can ignore this message.</p>`,
+       <p class="ss-muted" style="color:#636D7B;font-size:13px;line-height:19px;">If you did not request this code you can ignore this message.</p>`,
     );
     return { subject, text, html };
   },
@@ -148,14 +150,14 @@ If you did not request this code, you can ignore this message. Someone may have 
   account_invite(ctx: TemplateContext, d: { link: string; inviterName: string; ttlHours: number }): Rendered {
     const subject = `You have been invited to ${ctx.productName}`;
     const text = `${d.inviterName} has invited you to use ${ctx.productName} at ${ctx.organisationName}.\n\nSet up your account: ${d.link}\n\nThis link expires in ${d.ttlHours} hours. You will be asked to choose a password and set up a passkey or authenticator app.`;
-    const html = layout(ctx, subject, `<p><strong>${esc(d.inviterName)}</strong> has invited you to use ${esc(ctx.productName)}.</p>${button(ctx, d.link, 'Set up your account')}<p class="ss-muted" style="font-size:13px;line-height:19px;color:#636B66;">This link expires in ${d.ttlHours} hours. You will be asked to choose a password and set up a passkey or authenticator app.</p>`);
+    const html = layout(ctx, subject, `<p><strong>${esc(d.inviterName)}</strong> has invited you to use ${esc(ctx.productName)}.</p>${button(ctx, d.link, 'Set up your account')}<p class="ss-muted" style="font-size:13px;line-height:19px;color:#636D7B;">This link expires in ${d.ttlHours} hours. You will be asked to choose a password and set up a passkey or authenticator app.</p>`);
     return { subject, text, html };
   },
 
   password_reset(ctx: TemplateContext, d: { link: string; ttlMinutes: number }): Rendered {
     const subject = `${ctx.productName} password reset`;
     const text = `A password reset was requested for your ${ctx.productName} account.\n\nReset your password: ${d.link}\n\nThe link expires in ${d.ttlMinutes} minutes. Your second factor is still required to sign in afterwards. If you did not request this, ignore this message.`;
-    const html = layout(ctx, subject, `<p>A password reset was requested for your account.</p>${button(ctx, d.link, 'Reset password')}<p class="ss-muted" style="font-size:13px;line-height:19px;color:#636B66;">The link expires in ${d.ttlMinutes} minutes. Your second factor is still required to sign in afterwards. If you did not request this, ignore this message.</p>`);
+    const html = layout(ctx, subject, `<p>A password reset was requested for your account.</p>${button(ctx, d.link, 'Reset password')}<p class="ss-muted" style="font-size:13px;line-height:19px;color:#636D7B;">The link expires in ${d.ttlMinutes} minutes. Your second factor is still required to sign in afterwards. If you did not request this, ignore this message.</p>`);
     return { subject, text, html };
   },
 

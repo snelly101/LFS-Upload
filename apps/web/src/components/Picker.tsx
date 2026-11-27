@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Icon } from './Icon';
 
 export interface PickOption<V extends string> {
   value: V;
@@ -53,6 +54,7 @@ export function Picker<V extends string>({ value, options, onChange, disabled, l
     <span className="pick" ref={root}>
       <button ref={btn} type="button" id={id} aria-haspopup="menu" aria-expanded={open} aria-label={ariaLabel} disabled={disabled} title={disabled ? lockedHint : undefined} onClick={() => setOpen((o) => !o)}>
         {children}
+        <Icon name={disabled ? 'lock' : 'chevron-down'} size={14} className="chev" />
       </button>
       {disabled && lockedHint ? <span className="visually-hidden"> ({lockedHint})</span> : null}
       {open && (
@@ -75,7 +77,7 @@ export function Picker<V extends string>({ value, options, onChange, disabled, l
                 if (e.key === 'ArrowUp') { e.preventDefault(); move(-1, e.currentTarget); }
               }}
             >
-              <span className="tick" aria-hidden="true">{o.value === value ? '✓' : ''}</span>
+              <span className="tick" aria-hidden="true">{o.value === value ? <Icon name="check" size={16} /> : null}</span>
               <span>
                 {o.label}
                 {o.hint && <small>{o.hint}</small>}

@@ -6,6 +6,7 @@ import { get } from '../api';
 import { transferState } from '../components/Status';
 import { fmt, countdown } from '../lib/time';
 import { usePollInterval } from '../lib/live';
+import { Icon } from '../components/Icon';
 
 const FILTERS = [
   ['all', 'Everything'],
@@ -30,9 +31,10 @@ function RequestRow({ t }: { t: TransferSummary }) {
   const label = closed ? 'Closed' : live ? 'Open' : s.label;
   return (
     <Link to={`/sent/${t.id}`} className="sent-row">
+      <span className="row-ico in" aria-hidden="true"><Icon name="inbox" size={20} /></span>
       <div style={{ minWidth: 0 }}>
         <div className="t">{t.title || 'Untitled'}</div>
-        <div className="to"><span className="tag tag-in"><span aria-hidden="true">↓</span> Request</span> from {from}</div>
+        <div className="to"><span className="tag tag-in">Request</span> from {from}</div>
       </div>
       <div>
         <span className={`stamp stamp-${closed ? 'neutral' : s.tone}`}>{label}</span>
@@ -65,6 +67,7 @@ function Row({ t }: { t: TransferSummary }) {
   const tone = s.tone;
   return (
     <Link to={unsent ? `/?id=${t.id}` : `/sent/${t.id}`} className="sent-row">
+      <span className="row-ico" aria-hidden="true"><Icon name="send" size={20} /></span>
       <div style={{ minWidth: 0 }}>
         <div className="t">{t.title || 'Untitled'}</div>
         <div className="to">{to}</div>
@@ -110,17 +113,20 @@ export function SentPage() {
     <>
       <h1 className="lede">Sent</h1>
       <p className="lede-sub">Everything you have sent or asked for, and where each one stands.</p>
-      <div className="filters">
+      <div className="list-tools">
+      <div className="filters" role="group" aria-label="Filter">
         {FILTERS.map(([k, label]) => (
           <button key={k} type="button" className="pill" aria-pressed={status === k} onClick={() => set({ status: k === 'all' ? '' : k })}>{label}</button>
         ))}
         <span className="filters-sep" aria-hidden="true" />
         <button type="button" className="pill" aria-pressed={kind === 'outbound'} onClick={() => set({ kind: kind === 'outbound' ? '' : 'sent' })}>Sent by me</button>
         <button type="button" className="pill" aria-pressed={kind === 'inbound'} onClick={() => set({ kind: kind === 'inbound' ? '' : 'requests' })}>Requests</button>
-        <form onSubmit={search} role="search">
+      </div>
+        <form onSubmit={search} role="search" className="search">
+          <Icon name="search" />
           <label htmlFor="tq" className="visually-hidden">Search by subject or recipient</label>
           <input id="tq" className="input" type="search" placeholder="Search subject or person" value={draftQ} onChange={(e) => setDraftQ(e.target.value)} />
-          <button className="btn">Search</button>
+          <button className="visually-hidden">Search</button>
         </form>
       </div>
       {query.isError && <div className="notice notice-err">Could not load your transfers.</div>}
@@ -128,7 +134,7 @@ export function SentPage() {
         <div className="empty">
           <h2>{q || status !== 'all' ? 'Nothing matches' : 'Nothing sent yet'}</h2>
           <p>{q || status !== 'all' ? 'Try a different filter or search.' : 'When you send files, they will be listed here with their progress.'}</p>
-          {!q && status === 'all' && <Link to="/" className="btn btn-primary">Send files</Link>}
+          {!q && status === 'all' && <Link to="/" className="btn btn-primary"><Icon name="send" />Send files</Link>}
         </div>
       ) : (
         <div className="sentlist" aria-live="polite" aria-busy={query.isFetching}>
@@ -158,7 +164,7 @@ export function RecentSends({ excludeId }: { excludeId?: string } = {}) {
     <section aria-labelledby="recent-h">
       <div className="row-between">
         <h2 id="recent-h" className="section-h" style={{ margin: 0 }}>Recent</h2>
-        <Link to="/sent" className="small">All sent →</Link>
+        <Link to="/sent" className="back" style={{ margin: 0 }}>All sent <Icon name="arrow-right" size={16} /></Link>
       </div>
       <div className="sentlist" style={{ marginTop: 8 }}>
         {items.map((t) => <Row key={t.id} t={t} />)}

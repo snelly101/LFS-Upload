@@ -10,6 +10,7 @@ import { Steps, headline } from '../components/Steps';
 import { fmt, fmtLong, countdown, toLocalInput, fromLocalInput } from '../lib/time';
 import { refCode } from '../lib/labels';
 import { usePollInterval } from '../lib/live';
+import { Icon, FileIcon, Avatar } from '../components/Icon';
 import { RequestDetail } from './RequestDetail';
 
 export { prefLabel } from '../lib/labels';
@@ -86,7 +87,7 @@ export function TransferDetailPage() {
 
   return (
     <>
-      <p className="small" style={{ marginBottom: 14 }}><Link to="/sent">← Sent</Link></p>
+      <Link to="/sent" className="back" aria-label="Back to Sent"><Icon name="arrow-left" size={16} />Sent</Link>
       <div className="detail-head">
         <div style={{ minWidth: 0 }}>
           <h1 className="lede">{headline(d)}</h1>
@@ -104,11 +105,11 @@ export function TransferDetailPage() {
       </p>
       <div className="actions">
         {isUnsent && <Link to={`/?id=${d.id}`} className="btn btn-primary">Continue</Link>}
-        {isLive && <button className="btn" onClick={() => { setErr(null); setEmail(''); setDialog('add-recipient'); }}>Add someone</button>}
-        {isLive && d.effectivePolicy.allowExpiryExtension !== false && <button className="btn" onClick={() => { setExpiry(toLocalInput(d.expiresAt)); setErr(null); setDialog('extend'); }}>Change expiry</button>}
-        {isLive && <button className="btn btn-danger" onClick={() => { setErr(null); setDeleteNow(false); setDialog('revoke'); }}>Stop sharing</button>}
-        {!isLive && !isUnsent && d.deletionStatus === 'none' && <button className="btn btn-danger" onClick={() => { setErr(null); setDialog('delete'); }}>Delete files now</button>}
-        {isUnsent && <button className="btn btn-danger" onClick={() => { setErr(null); setDialog('delete'); }}>Discard</button>}
+        {isLive && <button className="btn" onClick={() => { setErr(null); setEmail(''); setDialog('add-recipient'); }}><Icon name="plus" size={16} />Add someone</button>}
+        {isLive && d.effectivePolicy.allowExpiryExtension !== false && <button className="btn" onClick={() => { setExpiry(toLocalInput(d.expiresAt)); setErr(null); setDialog('extend'); }}><Icon name="clock" size={16} />Change expiry</button>}
+        {isLive && <button className="btn btn-danger" onClick={() => { setErr(null); setDeleteNow(false); setDialog('revoke'); }}><Icon name="stop" size={16} />Stop sharing</button>}
+        {!isLive && !isUnsent && d.deletionStatus === 'none' && <button className="btn btn-danger" onClick={() => { setErr(null); setDialog('delete'); }}><Icon name="trash" size={16} />Delete files now</button>}
+        {isUnsent && <button className="btn btn-danger" onClick={() => { setErr(null); setDialog('delete'); }}><Icon name="trash" size={16} />Discard</button>}
         <button className="btn push" onClick={() => window.location.assign('/')}>Send more files</button>
       </div>
 
@@ -125,6 +126,7 @@ export function TransferDetailPage() {
         <div className="people">
           {d.grants.map((g) => (
             <div className="person" key={g.id}>
+              <Avatar text={g.email} />
               <div>
                 <div className="em" style={{ textDecoration: g.status === 'revoked' ? 'line-through' : undefined }}>{g.email}</div>
                 <div className="sub">
@@ -136,11 +138,11 @@ export function TransferDetailPage() {
               <div className="acts">
                 {isLive && g.status === 'invited' && (
                   <details className="menu-btn">
-                    <summary className="btn btn-sm" aria-label={`Actions for ${g.email}`}>···</summary>
+                    <summary className="btn btn-sm" aria-label={`Actions for ${g.email}`}><Icon name="more" /></summary>
                     <div className="menu">
-                      {!g.allFilesCompletedAt && <button type="button" onClick={() => { closeMenus(); void remind(g); }}>Send a reminder</button>}
-                      <button type="button" onClick={() => { closeMenus(); void resend(g); }}>Send a fresh link</button>
-                      <button type="button" className="danger" onClick={() => { closeMenus(); setGrant(g); setErr(null); setDialog('revoke-grant'); }}>Remove access</button>
+                      {!g.allFilesCompletedAt && <button type="button" onClick={() => { closeMenus(); void remind(g); }}><Icon name="bell" />Send a reminder</button>}
+                      <button type="button" onClick={() => { closeMenus(); void resend(g); }}><Icon name="mail" />Send a fresh link</button>
+                      <button type="button" className="danger" onClick={() => { closeMenus(); setGrant(g); setErr(null); setDialog('revoke-grant'); }}><Icon name="x" />Remove access</button>
                     </div>
                   </details>
                 )}
@@ -154,9 +156,10 @@ export function TransferDetailPage() {
       <ul className="files-plain">
         {d.files.map((f) => (
           <li key={f.id}>
+            <FileIcon name={f.displayName} />
             <span style={{ overflowWrap: 'anywhere' }}>
               {f.displayName}
-              {f.scanStatus !== 'clean' && <span className="small" style={{ color: f.scanStatus === 'infected' ? 'var(--red)' : 'var(--amber)' }}> · {f.scanStatus === 'infected' ? 'blocked by malware scan' : f.scanStatus === 'oversized' ? 'not scanned (too large)' : `scan ${f.scanStatus}`}</span>}
+              {f.scanStatus !== 'clean' && <span className="small" style={{ color: f.scanStatus === 'infected' ? 'var(--err)' : 'var(--warn)' }}> · {f.scanStatus === 'infected' ? 'blocked by malware scan' : f.scanStatus === 'oversized' ? 'not scanned (too large)' : `scan ${f.scanStatus}`}</span>}
               {f.storageState === 'deleted' && <span className="small muted"> · deleted</span>}
             </span>
             <span className="sz">{formatBytes(f.sizeBytes)}</span>

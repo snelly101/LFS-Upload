@@ -51,7 +51,7 @@ async function signIn(p, email, firstShots = false) {
 const H = { 'X-Requested-With': 'securesend' };
 
 // ---------------------------------------------------------------- sender
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 820 }, deviceScaleFactor: 1 });
+const ctx = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1280, height: 820 }, deviceScaleFactor: 1 });
 const page = await ctx.newPage();
 watch(page, 'sender');
 await signIn(page, 'alex.sender@dev.securesend.invalid', true);
@@ -87,7 +87,7 @@ const transferUrl = page.url();
 // ---------------------------------------------------------------- recipient (fresh mobile context)
 const mail = await waitMail((t) => t.includes('sam.recipient@example.invalid') && t.includes('has sent you'), sentAt);
 const link = mail.match(/http:\/\/localhost:3000\/r\/[A-Za-z0-9_-]+/)[0].replace('http://localhost:3000', BASE);
-const rctx = await browser.newContext({ viewport: { width: 412, height: 860 }, isMobile: true, hasTouch: true });
+const rctx = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 412, height: 860 }, isMobile: true, hasTouch: true });
 const rp = await rctx.newPage();
 watch(rp, 'recipient');
 await rp.goto(link);
@@ -136,7 +136,7 @@ const requestUrl = new URL(await page.getAttribute('a:has-text("Track it")', 'hr
 
 const askMail = await waitMail((t) => t.includes('jo.tenant@example.invalid') && t.includes('asked you to send files'), askedAt);
 const askLink = askMail.match(/http:\/\/localhost:3000\/r\/[A-Za-z0-9_-]+/)[0].replace('http://localhost:3000', BASE);
-const cctx = await browser.newContext({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true });
+const cctx = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true });
 const cp = await cctx.newPage();
 watch(cp, 'contributor');
 await cp.goto(askLink);
@@ -216,7 +216,7 @@ const drafts = await (await page.request.get(`${BASE}/api/transfers?status=draft
 const draftId = drafts.items[0]?.id;
 
 // ---------------------------------------------------------------- admin
-const actx = await browser.newContext({ viewport: { width: 1280, height: 820 } });
+const actx = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1280, height: 820 } });
 const ap = await actx.newPage();
 watch(ap, 'admin');
 await signIn(ap, 'admin@dev.securesend.invalid');
@@ -293,7 +293,7 @@ try {
   const inv = await ap.request.post(`${BASE}/api/admin/users/invite`, { headers: H, data: { email, displayName: 'Quinn Demo', role: 'sender' } });
   const invJson = await inv.json();
   if (invJson.invitationLink) {
-    const ectx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const ectx = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1280, height: 900 } });
     const ep = await ectx.newPage();
     watch(ep, 'enrol');
     await ep.goto(invJson.invitationLink.replace('http://localhost:3000', BASE));

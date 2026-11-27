@@ -10,6 +10,7 @@ import { RequestSteps, requestHeadline } from '../components/Steps';
 import { fmt, fmtLong, countdown, toLocalInput, fromLocalInput } from '../lib/time';
 import { refCode } from '../lib/labels';
 import { usePollInterval } from '../lib/live';
+import { Icon, FileIcon, Avatar } from '../components/Icon';
 
 type DialogKind = null | 'close' | 'remove' | 'add' | 'extend' | 'delete';
 
@@ -89,7 +90,7 @@ export function RequestDetail({ d }: { d: TransferDetail }) {
 
   return (
     <>
-      <p className="small" style={{ marginBottom: 14 }}><Link to="/sent">← Sent</Link></p>
+      <Link to="/sent" className="back" aria-label="Back to Sent"><Icon name="arrow-left" size={16} />Sent</Link>
       <div className="detail-head">
         <div style={{ minWidth: 0 }}>
           <span className="tag tag-in" style={{ marginBottom: 8 }}><span aria-hidden="true">↓</span> File request</span>
@@ -108,10 +109,10 @@ export function RequestDetail({ d }: { d: TransferDetail }) {
         <span className="ref">REF {refCode(d.id)}</span>
       </p>
       <div className="actions">
-        {open && <button className="btn" onClick={() => { setErr(null); setEmail(''); setDialog('add'); }}>Add someone</button>}
-        {isLive && d.effectivePolicy.allowExpiryExtension !== false && <button className="btn" onClick={() => { setExpiry(toLocalInput(d.expiresAt)); setErr(null); setDialog('extend'); }}>Change closing date</button>}
-        {open && <button className="btn" onClick={() => { setErr(null); setDialog('close'); }}>Close to new files</button>}
-        {d.deletionStatus === 'none' && <button className="btn btn-danger" onClick={() => { setErr(null); setDialog('delete'); }}>Delete everything now</button>}
+        {open && <button className="btn" onClick={() => { setErr(null); setEmail(''); setDialog('add'); }}><Icon name="plus" size={16} />Add someone</button>}
+        {isLive && d.effectivePolicy.allowExpiryExtension !== false && <button className="btn" onClick={() => { setExpiry(toLocalInput(d.expiresAt)); setErr(null); setDialog('extend'); }}><Icon name="clock" size={16} />Change closing date</button>}
+        {open && <button className="btn" onClick={() => { setErr(null); setDialog('close'); }}><Icon name="lock" size={16} />Close to new files</button>}
+        {d.deletionStatus === 'none' && <button className="btn btn-danger" onClick={() => { setErr(null); setDialog('delete'); }}><Icon name="trash" size={16} />Delete everything now</button>}
       </div>
 
       {flash && <div className="notice notice-info" role="status">{flash} <button className="btn-link" onClick={() => setFlash(null)}>Dismiss</button></div>}
@@ -128,6 +129,7 @@ export function RequestDetail({ d }: { d: TransferDetail }) {
             const s = fileState(f);
             return (
               <li key={f.id}>
+                <FileIcon name={f.displayName} />
                 <span style={{ minWidth: 0 }}>
                   <span className="fname">{f.displayName}</span>
                   <span className="small muted" style={{ display: 'block', overflowWrap: 'anywhere' }}>
@@ -135,7 +137,7 @@ export function RequestDetail({ d }: { d: TransferDetail }) {
                   </span>
                 </span>
                 {s.downloadable && isLive && (
-                  <a className="btn btn-sm" href={`/api/transfers/${d.id}/files/${f.id}/download`} download={f.displayName} aria-label={`Download ${f.displayName}`}>Download</a>
+                  <a className="btn btn-sm" href={`/api/transfers/${d.id}/files/${f.id}/download`} download={f.displayName} aria-label={`Download ${f.displayName}`}><Icon name="download" size={16} />Download</a>
                 )}
               </li>
             );
@@ -154,6 +156,7 @@ export function RequestDetail({ d }: { d: TransferDetail }) {
             const removed = g.status === 'revoked' && !endedByClose;
             return (
               <div className="person" key={g.id}>
+                <Avatar text={g.email} />
                 <div>
                   <div className="em" style={{ textDecoration: removed ? 'line-through' : undefined }}>{g.email}</div>
                   <div className="sub">
@@ -165,11 +168,11 @@ export function RequestDetail({ d }: { d: TransferDetail }) {
                 <div className="acts">
                   {open && g.status === 'invited' && (
                     <details className="menu-btn">
-                      <summary className="btn btn-sm" aria-label={`Actions for ${g.email}`}>···</summary>
+                      <summary className="btn btn-sm" aria-label={`Actions for ${g.email}`}><Icon name="more" /></summary>
                       <div className="menu">
-                        <button type="button" onClick={() => { closeMenus(); void nudge(g, 'remind'); }}>Send a reminder</button>
-                        <button type="button" onClick={() => { closeMenus(); void nudge(g, 'resend'); }}>Send a fresh link</button>
-                        <button type="button" className="danger" onClick={() => { closeMenus(); setGrant(g); setErr(null); setDialog('remove'); }}>Remove</button>
+                        <button type="button" onClick={() => { closeMenus(); void nudge(g, 'remind'); }}><Icon name="bell" />Send a reminder</button>
+                        <button type="button" onClick={() => { closeMenus(); void nudge(g, 'resend'); }}><Icon name="mail" />Send a fresh link</button>
+                        <button type="button" className="danger" onClick={() => { closeMenus(); setGrant(g); setErr(null); setDialog('remove'); }}><Icon name="x" />Remove</button>
                       </div>
                     </details>
                   )}

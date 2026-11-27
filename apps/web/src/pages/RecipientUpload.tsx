@@ -3,6 +3,7 @@ import { formatBytes, formatRate, type RecipientInboundView } from '@securesend/
 import { get, post, ApiError } from '../api';
 import { fmtLong, countdown } from '../lib/time';
 import { useUploads, uploadMemory, type UploadItem } from '../lib/uploads';
+import { Icon, FileIcon, Avatar } from '../components/Icon';
 
 type ServerUpload = RecipientInboundView['uploads'][number];
 
@@ -183,9 +184,12 @@ export default function ContributorPanel({ base, view, onView, onSessionLost, on
   return (
     <>
       <div className="rcpt-from">
-        <div className="name">{view.requesterName}</div>
-        <div className="small muted" style={{ overflowWrap: 'anywhere' }}>
-          {view.requesterEmail} · asking {view.recipientEmail}
+        <Avatar text={view.requesterName || view.requesterEmail} size="lg" />
+        <div style={{ minWidth: 0 }}>
+          <div className="name">{view.requesterName}</div>
+          <div className="small muted" style={{ overflowWrap: 'anywhere' }}>
+            {view.requesterEmail} · asking {view.recipientEmail}
+          </div>
         </div>
       </div>
       <h1 style={{ fontSize: '1.3rem' }}>{view.title}</h1>
@@ -196,7 +200,7 @@ export default function ContributorPanel({ base, view, onView, onSessionLost, on
       ) : (
         <div className={`rcpt-drop ${over ? 'over' : ''}`}>
           <input ref={input} type="file" multiple className="visually-hidden" aria-label="Choose files to send" tabIndex={-1} onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} />
-          <button type="button" className="btn btn-primary btn-lg" onClick={() => input.current?.click()}>Choose files</button>
+          <button type="button" className="btn btn-primary btn-lg" onClick={() => input.current?.click()}><Icon name="upload" size={20} />Choose files</button>
           <p className="or">or drop them anywhere on this page</p>
           <p className="fine">
             Up to {formatBytes(limits.maxFileBytes, 0)} per file{limits.scanLimited ? ' (the most the malware scanner can check)' : ''}. Uploads carry on where they left off if your connection drops.
@@ -241,6 +245,7 @@ export default function ContributorPanel({ base, view, onView, onSessionLost, on
               }
               return (
                 <li key={r.key}>
+                  <FileIcon name={r.name} state={tone === 'err' ? 'err' : ''} />
                   <span style={{ minWidth: 0, flex: 1 }}>
                     <span className="fname">{r.name}</span>
                     <span className="small" style={{ display: 'block' }}>

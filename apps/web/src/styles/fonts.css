@@ -1,30 +1,9 @@
-/* Self-hosted variable fonts (latin subset only, OFL-1.1). Files are bundled by Vite; the browser
-   downloads only the faces the active theme actually uses. */
+/* Self-hosted variable font (latin subset only, OFL-1.1). The file is bundled by Vite; nothing is
+   fetched from a third party. */
 @font-face {
-  font-family: 'Fraunces';
+  font-family: 'Figtree';
   font-style: normal;
   font-display: swap;
-  font-weight: 100 900;
-  src: url('../../node_modules/@fontsource-variable/fraunces/files/fraunces-latin-opsz-normal.woff2') format('woff2-variations');
-}
-@font-face {
-  font-family: 'Public Sans';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  src: url('../../node_modules/@fontsource-variable/public-sans/files/public-sans-latin-wght-normal.woff2') format('woff2-variations');
-}
-@font-face {
-  font-family: 'Atkinson Hyperlegible Mono';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 200 800;
-  src: url('../../node_modules/@fontsource-variable/atkinson-hyperlegible-mono/files/atkinson-hyperlegible-mono-latin-wght-normal.woff2') format('woff2-variations');
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  src: url('../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2-variations');
+  font-weight: 300 900;
+  src: url('../../node_modules/@fontsource-variable/figtree/files/figtree-latin-wght-normal.woff2') format('woff2-variations');
 }

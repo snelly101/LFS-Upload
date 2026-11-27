@@ -44,7 +44,7 @@ jobs:
       # Actions are pinned by major version; Dependabot (.github/dependabot.yml) proposes updates.
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4 # version comes from "packageManager" in package.json (pnpm 10.28.0)
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Multi-stage build: shared package, API (tsc) and web UI (vite) in one image; the API serves apps/web/dist.
-FROM node:22.12.0-bookworm-slim AS build
+FROM node:26.13.1-bookworm-slim AS build
 ENV CI=true PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 # corepack is deliberately not used: its bundled signing keys lag behind pnpm releases and the install fails.
 RUN npm install -g pnpm@10.28.0
@@ -21,7 +21,7 @@ RUN rm -rf node_modules apps/*/node_modules packages/*/node_modules \
  && pnpm install --prod --frozen-lockfile --filter @securesend/api --filter @securesend/shared \
  && rm -rf apps/web/src apps/web/node_modules apps/api/src tests
 
-FROM node:22.12.0-bookworm-slim AS runtime
+FROM node:26.13.1-bookworm-slim AS runtime
 ENV NODE_ENV=production WEB_DIST=/app/apps/web/dist
 RUN groupadd -g 10001 app && useradd -u 10001 -g app -M -d /app -s /usr/sbin/nologin app
 COPY --from=build --chown=app:app /app /app

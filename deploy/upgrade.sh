@@ -63,7 +63,8 @@ docker compose stop api worker
 docker compose run --rm --no-deps api node dist/cli.js migrate
 docker compose up -d
 log "Waiting for the api to report healthy"
-docker compose up -d --wait api || die "api did not become healthy; inspect 'docker compose logs api' and consider deploy/rollback.sh"
+wait_for_api || die "api did not become healthy; inspect 'docker compose logs api' and consider deploy/rollback.sh"
+report_scanner
 
 git -C "$DEPLOY_DIR/.." rev-parse HEAD > .deployed-commit 2>/dev/null || true
 docker compose ps

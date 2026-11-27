@@ -73,4 +73,27 @@ newest_backup() {
     | sort -r | head -n1 | sed "s|^|$dir/|"
 }
 
+# wait_for_api — wait on the api's own health check only. `up --wait api` without --no-deps also waits on
+# the services it depends on, so a scanner that is still loading signatures would fail an otherwise good upgrade.
+wait_for_api() {
+  docker compose up -d --no-build --no-deps --wait api
+}
+
+# report_scanner — say where the scanner stands without failing the caller. Uploads stay in quarantine
+# while it is down (fail closed), so this is a warning for the operator, not a reason to roll back.
+report_scanner() {
+  local id h
+  id="$(docker compose ps -q clamav 2>/dev/null || true)"
+  if [ -z "$id" ]; then
+    warn "the scanner container is not running; new uploads will wait in quarantine. Start it with: docker compose up -d clamav"
+    return 0
+  fi
+  h="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$id" 2>/dev/null || echo unknown)"
+  case "$h" in
+    healthy)  log "Scanner: healthy." ;;
+    starting) log "Scanner: still loading virus signatures (normal for several minutes after a restart). Uploads wait in quarantine until it is ready." ;;
+    *)        warn "scanner health is '$h'; new uploads will wait in quarantine until it recovers. Inspect: docker compose logs --tail=50 clamav" ;;
+  esac
+}
+
 require_root() { [ "$(id -u)" -eq 0 ] || die "run as root (sudo $0)"; }

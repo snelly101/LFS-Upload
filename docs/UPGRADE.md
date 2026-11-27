@@ -38,6 +38,8 @@ Pin a version tag in production. `:main` moves with every merge.
    * builds or pulls the application image and pulls the pinned third-party images;
    * waits for PostgreSQL to be healthy, stops api and worker, applies migrations
      (`node dist/cli.js migrate`, advisory-locked and idempotent), starts everything and waits for the api health check;
+   * reports the scanner's state without failing on it: after a restart clamd needs several minutes to load
+     its signatures, and uploads simply wait in quarantine until it is ready;
    * keeps the three most recent rollback images.
 5. Check `sudo deploy/monitor-check.sh`, System health, and send a test transfer.
 6. If `deploy/systemd/` changed in the release, re-run `sudo deploy/install-timers.sh`.

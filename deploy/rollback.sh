@@ -26,7 +26,8 @@ CURRENT="$(env_get SECURESEND_IMAGE)"
 [ -n "$CURRENT" ] && echo "$CURRENT" > .image-before-rollback
 env_set SECURESEND_IMAGE "$PREV"
 docker compose up -d --no-build api worker
-docker compose up -d --no-build --wait api || die "api did not become healthy on $PREV; inspect 'docker compose logs api'"
+wait_for_api || die "api did not become healthy on $PREV; inspect 'docker compose logs api'"
+report_scanner
 docker compose ps
 echo
 log "Rolled back to $PREV (pinned as SECURESEND_IMAGE in $ENV_FILE)."

@@ -134,11 +134,32 @@ if [ -n "$(swapon --show --noheadings 2>/dev/null)" ]; then
 else
   ok "swap is off"
 fi
-if write_file /etc/sysctl.d/90-securesend.conf 644 <<'CONF'
+write_file /etc/sysctl.d/90-securesend.conf 644 <<'CONF' || true
 kernel.core_pattern=|/bin/false
 fs.suid_dumpable=0
 CONF
-then sysctl --system >/dev/null; fi
+# Ubuntu's crash reporter (apport) sets fs.suid_dumpable=2 and points kernel.core_pattern at itself every
+# time it starts, after the boot-time sysctl pass. It collects process memory, so it has no place here.
+if systemctl list-unit-files 'apport*' --no-legend 2>/dev/null | grep -q .; then
+  APPORT_UNITS="$(systemctl list-unit-files 'apport*' --no-legend 2>/dev/null | awk '{print $1}' | grep -v '@' | tr '\n' ' ')"
+  # shellcheck disable=SC2086
+  if systemctl is-enabled --quiet $APPORT_UNITS 2>/dev/null || systemctl is-active --quiet $APPORT_UNITS 2>/dev/null; then
+    # shellcheck disable=SC2086
+    systemctl disable --now $APPORT_UNITS >/dev/null 2>&1 || true
+    # shellcheck disable=SC2086
+    systemctl mask apport.service >/dev/null 2>&1 || true
+    changed "crash reporter (apport) stopped and disabled"
+  else
+    ok "crash reporter (apport) is disabled"
+  fi
+  if [ -f /etc/default/apport ] && ! grep -q '^enabled=0' /etc/default/apport; then
+    sed -i 's/^enabled=.*/enabled=0/' /etc/default/apport
+    grep -q '^enabled=0' /etc/default/apport || echo 'enabled=0' >> /etc/default/apport
+    changed "/etc/default/apport (enabled=0)"
+  fi
+fi
+# Apply on every run, not only when the file changed: something else may have altered the live values.
+sysctl -q -p /etc/sysctl.d/90-securesend.conf || true
 if write_file /etc/systemd/system.conf.d/90-securesend-no-core.conf 644 <<'CONF'
 # Managed by deploy/harden-host.sh
 [Manager]
@@ -151,7 +172,18 @@ write_file /etc/systemd/coredump.conf.d/90-securesend.conf 644 <<'CONF' || true
 Storage=none
 ProcessSizeMax=0
 CONF
-if [ "$(sysctl -n fs.suid_dumpable 2>/dev/null)" = "0" ]; then ok "fs.suid_dumpable=0"; else problem "fs.suid_dumpable is not 0"; fi
+DUMPABLE="$(sysctl -n fs.suid_dumpable 2>/dev/null || echo unknown)"
+if [ "$DUMPABLE" = "0" ]; then
+  ok "fs.suid_dumpable=0"
+else
+  problem "fs.suid_dumpable is $DUMPABLE, not 0. Find what sets it: grep -rs suid_dumpable /etc/sysctl.conf /etc/sysctl.d /usr/lib/sysctl.d /run/sysctl.d"
+fi
+CORE_PATTERN="$(sysctl -n kernel.core_pattern 2>/dev/null || echo unknown)"
+if [ "$CORE_PATTERN" = "|/bin/false" ]; then
+  ok "core dumps are discarded"
+else
+  problem "kernel.core_pattern is '$CORE_PATTERN', not '|/bin/false'"
+fi
 
 echo "== Clock"
 if command -v timedatectl >/dev/null 2>&1; then
